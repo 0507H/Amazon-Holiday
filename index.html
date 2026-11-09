@@ -27,10 +27,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 .side .brand .logo{width:44px;height:44px;object-fit:contain;flex-shrink:0}
 .side .brand small{display:block;font-weight:400;font-size:11px;color:#9DB9CF;margin-top:5px;line-height:1.6}
 .nav{padding:10px 8px;flex:1;overflow:auto}
-.nav .grp{font-size:12px;font-weight:700;color:#E6EEF7;padding:13px 11px 7px;letter-spacing:.5px;cursor:pointer;
-  display:flex;align-items:center;gap:7px;user-select:none;border-bottom:1px solid rgba(46,83,120,.5)}
-.nav .grp + .grp{margin-top:8px;border-bottom:none}
-.nav .grp .caret{font-size:10px;transition:transform .15s;width:10px;color:#9DB9CF}
+.nav .grp{font-size:13.5px;font-weight:700;color:#fff;padding:10px 11px;letter-spacing:.5px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;user-select:none;background:rgba(255,255,255,.07);
+  border-radius:8px;margin:6px 0 4px}
+.nav .grp + .grp{margin-top:10px}
+.nav .grp .g-ic{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.nav .grp .caret{font-size:10px;transition:transform .15s;width:10px;color:#9DB9CF;flex-shrink:0}
 .nav .grp.collapsed .caret{transform:rotate(-90deg)}
 .nav .grp-items{overflow:hidden}
 .nav .grp-items.collapsed{display:none}
@@ -73,13 +75,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
   <aside class="side">
     <div class="brand"><img class="logo" src="logo.png" alt="logo"><div>脆脆鲨·工作台</div></div>
     <nav class="nav" id="nav">
-      <div class="grp" data-target="grpAiItems"><span class="caret">▾</span>AI工具</div>
+      <div class="grp" data-target="grpAiItems"><span class="caret">▾</span><span class="g-ic">🤖</span>AI工具</div>
       <div class="grp-items" id="grpAiItems">
         <a data-view="pic-multi" data-title="批量传图片"><span class="ic">🗂️</span><span class="txt">批量传图片</span></a>
         <a data-view="ad-generator" data-title="批量传广告"><span class="ic">📝</span><span class="txt">批量传广告</span></a>
         <a data-view="date-fix" data-title="批量改日期"><span class="ic">📅</span><span class="txt">批量改日期</span></a>
       </div>
-      <div class="grp" data-target="grpHolItems"><span class="caret">▾</span>节日跟进</div>
+      <div class="grp" data-target="grpHolItems"><span class="caret">▾</span><span class="g-ic">🎃</span>节日跟进</div>
       <div class="grp-items" id="grpHolItems">
         <a class="placeholder" data-view="holiday-tracker" data-title="季节性产品跟进" title="季节性产品跟进"><span class="ic">🎃</span><span class="txt">季节品跟进</span><span class="tag">待上线</span></a>
       </div>
