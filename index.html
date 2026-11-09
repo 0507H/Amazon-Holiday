@@ -27,18 +27,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 .side .brand .logo{width:44px;height:44px;object-fit:contain;flex-shrink:0}
 .side .brand small{display:block;font-weight:400;font-size:11px;color:#9DB9CF;margin-top:5px;line-height:1.6}
 .nav{padding:10px 8px;flex:1;overflow:auto}
-.nav .grp{font-size:11px;color:#9DB9CF;padding:14px 11px 6px;letter-spacing:1px;cursor:pointer;
-  display:flex;align-items:center;gap:6px;user-select:none}
-.nav .grp .caret{font-size:10px;transition:transform .15s;width:10px}
+.nav .grp{font-size:12px;font-weight:700;color:#E6EEF7;padding:13px 11px 7px;letter-spacing:.5px;cursor:pointer;
+  display:flex;align-items:center;gap:7px;user-select:none;border-bottom:1px solid rgba(46,83,120,.5)}
+.nav .grp + .grp{margin-top:8px;border-bottom:none}
+.nav .grp .caret{font-size:10px;transition:transform .15s;width:10px;color:#9DB9CF}
 .nav .grp.collapsed .caret{transform:rotate(-90deg)}
 .nav .grp-items{overflow:hidden}
 .nav .grp-items.collapsed{display:none}
-.nav a{display:flex;align-items:center;gap:10px;padding:10px 11px;border-radius:8px;
+.nav a{display:flex;align-items:center;gap:10px;padding:10px 11px 10px 20px;border-radius:8px;
   color:var(--side-text);text-decoration:none;font-size:12.5px;margin-bottom:2px;transition:.15s;cursor:pointer}
 .nav a:hover{background:#2E5378;color:#fff}
 .nav a.on{background:var(--primary-soft);color:var(--primary);font-weight:600;box-shadow:inset 0 0 0 1px rgba(36,80,126,.35)}
-.nav a .ic{font-size:15px;width:18px;text-align:center}
+.nav a .ic{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.nav a .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav a .tag{margin-left:auto;font-size:10px;color:#9DB9CF;border:1px solid var(--side-line);border-radius:10px;padding:1px 7px;flex-shrink:0}
+.nav a.placeholder{opacity:.55;cursor:not-allowed}
+.nav a.placeholder:hover{background:transparent;color:var(--side-text)}
 .side .foot{padding:12px 16px;font-size:10.5px;color:#9DB9CF;border-top:1px solid var(--side-line);line-height:1.7}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--side);color:#fff;
+  padding:10px 20px;border-radius:9px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;
+  pointer-events:none;transition:opacity .25s;z-index:99}
+.toast.show{opacity:1}
 
 /* 主区 */
 .main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
@@ -64,14 +73,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
   <aside class="side">
     <div class="brand"><img class="logo" src="logo.png" alt="logo"><div>脆脆鲨·工作台</div></div>
     <nav class="nav" id="nav">
-      <div class="grp" id="grpToggle"><span class="caret">▾</span>AI工具</div>
-      <div class="grp-items" id="grpItems">
+      <div class="grp" data-target="grpAiItems"><span class="caret">▾</span>AI工具</div>
+      <div class="grp-items" id="grpAiItems">
         <a data-view="pic-multi" data-title="批量传图片"><span class="ic">🗂️</span><span class="txt">批量传图片</span></a>
         <a data-view="ad-generator" data-title="批量传广告"><span class="ic">📝</span><span class="txt">批量传广告</span></a>
         <a data-view="date-fix" data-title="批量改日期"><span class="ic">📅</span><span class="txt">批量改日期</span></a>
       </div>
+      <div class="grp" data-target="grpHolItems"><span class="caret">▾</span>节日跟进</div>
+      <div class="grp-items" id="grpHolItems">
+        <a class="placeholder" data-view="holiday-tracker" data-title="季节性产品跟进" title="季节性产品跟进"><span class="ic">🎃</span><span class="txt">季节品跟进</span><span class="tag">待上线</span></a>
+      </div>
     </nav>
     <div class="foot">本地浏览器运行<br>数据不上传服务器</div>
+    <div class="toast" id="toast"></div>
   </aside>
 
   <div class="main">
@@ -90,43 +104,58 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 
 <script>
 const TOOLS = {
-  'pic-multi':    { file: 'pic-multi.html',    title: '批量传图片' },
-  'ad-generator': { file: 'ad-generator.html', title: '批量传广告' },
-  'date-fix':     { file: 'date-fix.html',     title: '批量改日期' }
+  'pic-multi':    { file: 'pic-multi.html',    title: '批量传图片',   group: 'AI工具' },
+  'ad-generator': { file: 'ad-generator.html', title: '批量传广告',   group: 'AI工具' },
+  'date-fix':     { file: 'date-fix.html',     title: '批量改日期',   group: 'AI工具' }
 };
 const nav = document.getElementById('nav');
 const frame = document.getElementById('toolFrame');
 const titleEl = document.getElementById('pageTitle');
 const crumbEl = document.getElementById('crumb');
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+}
 
 function switchTool(key){
   const tool = TOOLS[key];
   if(!tool) return;
   frame.src = tool.file;
   titleEl.textContent = tool.title;
-  crumbEl.textContent = 'AI工具 / ' + tool.title;
+  crumbEl.textContent = tool.group + ' / ' + tool.title;
   nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.view === key));
 }
 
 nav.querySelectorAll('a').forEach(a => {
   a.addEventListener('click', e => {
     e.preventDefault();
-    switchTool(a.dataset.view);
+    const key = a.dataset.view;
+    if(!TOOLS[key]){
+      showToast(`「${a.dataset.title}」工具完善后上线`);
+      return;
+    }
+    switchTool(key);
   });
 });
 
 // 分组可展开 / 收起
-const grpToggle = document.getElementById('grpToggle');
-const grpItems = document.getElementById('grpItems');
-grpToggle.addEventListener('click', () => {
-  grpToggle.classList.toggle('collapsed');
-  grpItems.classList.toggle('collapsed');
+document.querySelectorAll('.grp').forEach(g => {
+  g.addEventListener('click', () => {
+    const items = document.getElementById(g.dataset.target);
+    g.classList.toggle('collapsed');
+    items.classList.toggle('collapsed');
+  });
 });
 
 // 默认选中第一个
 nav.querySelector('a').classList.add('on');
 titleEl.textContent = TOOLS['pic-multi'].title;
-crumbEl.textContent = 'AI工具 / ' + TOOLS['pic-multi'].title;
+crumbEl.textContent = TOOLS['pic-multi'].group + ' / ' + TOOLS['pic-multi'].title;
 </script>
 </body>
 </html>
