@@ -27,7 +27,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 .side .brand .logo{width:44px;height:44px;object-fit:contain;flex-shrink:0}
 .side .brand small{display:block;font-weight:400;font-size:11px;color:#9DB9CF;margin-top:5px;line-height:1.6}
 .nav{padding:10px 8px;flex:1;overflow:auto}
-.nav .grp{font-size:10px;color:#9DB9CF;padding:14px 11px 5px;letter-spacing:1px}
+.nav .grp{font-size:11px;color:#9DB9CF;padding:14px 11px 6px;letter-spacing:1px;cursor:pointer;
+  display:flex;align-items:center;gap:6px;user-select:none}
+.nav .grp .caret{font-size:10px;transition:transform .15s;width:10px}
+.nav .grp.collapsed .caret{transform:rotate(-90deg)}
+.nav .grp-items{overflow:hidden}
+.nav .grp-items.collapsed{display:none}
 .nav a{display:flex;align-items:center;gap:10px;padding:10px 11px;border-radius:8px;
   color:var(--side-text);text-decoration:none;font-size:12.5px;margin-bottom:2px;transition:.15s;cursor:pointer}
 .nav a:hover{background:#2E5378;color:#fff}
@@ -37,12 +42,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 
 /* 主区 */
 .main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
-.topbar{background:var(--panel);border-bottom:1px solid var(--line);padding:13px 24px;
+.topbar{background:var(--panel);border-bottom:1px solid var(--line);padding:12px 22px;
   display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
-.topbar h1{font-size:15.5px;font-weight:600;color:var(--text)}
+.topbar h1{font-size:17px;font-weight:600;color:var(--text)}
 .topbar .crumb{color:var(--text3);font-size:11.5px}
 .topbar .spacer{margin-left:auto}
-.iframe-wrap{flex:1;min-height:0;padding:14px 18px 18px}
+.iframe-wrap{flex:1;min-height:0;padding:10px 14px 14px}
 .iframe-wrap iframe{width:100%;height:100%;border:1px solid var(--line);border-radius:var(--radius);
   background:var(--panel2);box-shadow:var(--shadow);display:block}
 
@@ -57,12 +62,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 <body>
 <div class="app">
   <aside class="side">
-    <div class="brand"><img class="logo" src="logo.png" alt="logo"><div>脆脆鲨·工作台<small>运营提效合集<br>US / DE 站点</small></div></div>
+    <div class="brand"><img class="logo" src="logo.png" alt="logo"><div>脆脆鲨·工作台</div></div>
     <nav class="nav" id="nav">
-      <div class="grp">工具</div>
-      <a data-view="pic-multi" data-title="多ASIN分组打包"><span class="ic">🗂️</span><span class="txt">多ASIN分组打包</span></a>
-      <a data-view="ad-generator" data-title="批量广告工具"><span class="ic">📝</span><span class="txt">批量广告工具</span></a>
-      <a data-view="date-fix" data-title="批量改日期"><span class="ic">📅</span><span class="txt">批量改日期</span></a>
+      <div class="grp" id="grpToggle"><span class="caret">▾</span>AI工具</div>
+      <div class="grp-items" id="grpItems">
+        <a data-view="pic-multi" data-title="批量传图片"><span class="ic">🗂️</span><span class="txt">批量传图片</span></a>
+        <a data-view="ad-generator" data-title="批量传广告"><span class="ic">📝</span><span class="txt">批量传广告</span></a>
+        <a data-view="date-fix" data-title="批量改日期"><span class="ic">📅</span><span class="txt">批量改日期</span></a>
+      </div>
     </nav>
     <div class="foot">本地浏览器运行<br>数据不上传服务器</div>
   </aside>
@@ -71,7 +78,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
     <header class="topbar">
       <div>
         <div class="crumb" id="crumb">工作台</div>
-        <h1 id="pageTitle">多ASIN分组打包</h1>
+        <h1 id="pageTitle">批量传图片</h1>
       </div>
       <div class="spacer"></div>
     </header>
@@ -83,8 +90,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 
 <script>
 const TOOLS = {
-  'pic-multi':    { file: 'pic-multi.html',    title: '多ASIN分组打包' },
-  'ad-generator': { file: 'ad-generator.html', title: '批量广告工具' },
+  'pic-multi':    { file: 'pic-multi.html',    title: '批量传图片' },
+  'ad-generator': { file: 'ad-generator.html', title: '批量传广告' },
   'date-fix':     { file: 'date-fix.html',     title: '批量改日期' }
 };
 const nav = document.getElementById('nav');
@@ -97,7 +104,7 @@ function switchTool(key){
   if(!tool) return;
   frame.src = tool.file;
   titleEl.textContent = tool.title;
-  crumbEl.textContent = '工作台 / ' + tool.title;
+  crumbEl.textContent = 'AI工具 / ' + tool.title;
   nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.view === key));
 }
 
@@ -108,8 +115,18 @@ nav.querySelectorAll('a').forEach(a => {
   });
 });
 
+// 分组可展开 / 收起
+const grpToggle = document.getElementById('grpToggle');
+const grpItems = document.getElementById('grpItems');
+grpToggle.addEventListener('click', () => {
+  grpToggle.classList.toggle('collapsed');
+  grpItems.classList.toggle('collapsed');
+});
+
 // 默认选中第一个
 nav.querySelector('a').classList.add('on');
+titleEl.textContent = TOOLS['pic-multi'].title;
+crumbEl.textContent = 'AI工具 / ' + TOOLS['pic-multi'].title;
 </script>
 </body>
 </html>
