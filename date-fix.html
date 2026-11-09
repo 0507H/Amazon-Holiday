@@ -39,10 +39,10 @@ body{font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-se
   width:38px; height:38px; border-radius:0; background:transparent;
   display:flex; align-items:center; justify-content:center; flex:none; font-size:20px;
 }
-#dateFixTool .tool-header .title { font-size:18px; font-weight:700; letter-spacing:.5px; }
-#dateFixTool .tool-header .subtitle { font-size:12.5px; color:#9aa7b8; margin-left:10px; }
+#dateFixTool .tool-header .title { font-size:18px; font-weight:700; letter-spacing:.5px; color:#fff; line-height:1; white-space:nowrap; }
+#dateFixTool .tool-header .subtitle { font-size:12.5px; color:#9aa7b8; margin-left:10px; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:75%; }
 
-#dateFixTool .container { max-width:100%; margin:0; padding:0 20px 16px; }
+#dateFixTool .container { max-width:100%; margin:0; padding:0 0 16px; }
 
 /* Cards */
 #dateFixTool .card {
@@ -122,10 +122,8 @@ body{font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-se
 
 <div class="tool-header">
   <div class="icon"><img src="logo.png" alt="" style="width:100%;height:100%;object-fit:contain"></div>
-  <div>
-    <div class="title">批量改日期</div>
-    <div class="subtitle">本地运行 · 将 Offering/Merchant Release Date 改为指定日期 · 自动生成后台上传文件</div>
-  </div>
+  <div class="title">批量改日期</div>
+  <div class="subtitle">本地运行 · 将 Offering/Merchant Release Date 改为指定日期 · 自动生成后台上传文件</div>
 </div>
 
 <div class="container">
