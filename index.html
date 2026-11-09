@@ -6,12 +6,12 @@
 <title>脆脆鲨·工作台</title>
 <style>
 :root{
-  --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --line2:#22262f;
-  --text:#e8ebf1; --text2:#a7aec0; --text3:#727a8e;
-  --primary:#ff8a3d; --primary-soft:#3a2718; --primary-glow:rgba(255,138,61,.18);
-  --side:#12141a; --side-line:#232733; --side-text:#9aa2b6;
+  --bg:#e6e2d6; --panel:#f5f2e9; --panel2:#efece1; --line:#d8d2c2; --line2:#e2ddcd;
+  --text:#26302c; --text2:#55605a; --text3:#8a9188;
+  --primary:#3f6f63; --primary-soft:#dce8e2; --primary-glow:rgba(63,111,99,.18);
+  --side:#33574f; --side-line:#44685f; --side-text:#c8d6d0;
   --radius:10px;
-  --shadow:0 1px 2px rgba(0,0,0,.35), 0 6px 18px rgba(0,0,0,.3);
+  --shadow:0 1px 2px rgba(60,50,30,.06), 0 6px 18px rgba(60,50,30,.08);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
@@ -23,17 +23,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
   display:flex;flex-direction:column;position:sticky;top:0;height:100vh;border-right:1px solid var(--side-line)}
 .side .brand{padding:18px 16px 14px;font-size:15px;font-weight:700;color:#fff;border-bottom:1px solid var(--side-line);
   display:flex;align-items:center;gap:9px}
-.side .brand .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#ff8a3d,#ffb347);
+.side .brand .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#3f6f63,#6aa594);
   display:grid;place-items:center;font-size:15px;flex-shrink:0}
-.side .brand small{display:block;font-weight:400;font-size:10.5px;color:#6f7789;margin-top:5px;line-height:1.6}
+.side .brand small{display:block;font-weight:400;font-size:10.5px;color:#9fb3ac;margin-top:5px;line-height:1.6}
 .nav{padding:10px 8px;flex:1;overflow:auto}
-.nav .grp{font-size:10px;color:#5a6274;padding:14px 11px 5px;letter-spacing:1px}
+.nav .grp{font-size:10px;color:#8fb0a6;padding:14px 11px 5px;letter-spacing:1px}
 .nav a{display:flex;align-items:center;gap:10px;padding:10px 11px;border-radius:8px;
   color:var(--side-text);text-decoration:none;font-size:12.5px;margin-bottom:2px;transition:.15s;cursor:pointer}
-.nav a:hover{background:#1c2029;color:#fff}
-.nav a.on{background:var(--primary-soft);color:var(--primary);font-weight:600;box-shadow:inset 0 0 0 1px rgba(255,138,61,.35)}
+.nav a:hover{background:#3d6259;color:#fff}
+.nav a.on{background:var(--primary-soft);color:var(--primary);font-weight:600;box-shadow:inset 0 0 0 1px rgba(63,111,99,.35)}
 .nav a .ic{font-size:15px;width:18px;text-align:center}
-.side .foot{padding:12px 16px;font-size:10.5px;color:#5a6274;border-top:1px solid var(--side-line);line-height:1.7}
+.side .foot{padding:12px 16px;font-size:10.5px;color:#9fb3ac;border-top:1px solid var(--side-line);line-height:1.7}
 
 /* 主区 */
 .main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
