@@ -25,7 +25,7 @@ body{font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-se
 #picTool .stat-pill b{color:inherit}#picTool .control-bar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;align-items:center}#picTool input[type="text"]{padding:7px 10px;border:1px solid #bcc8dd;border-radius:5px;font-size:14px}#picTool select{padding:7px 10px;border:1px solid #bcc8dd;border-radius:5px;font-size:14px;background:#F7F9FC}#picTool button{padding:8px 14px;border:none;border-radius:5px;cursor:pointer;font-weight:500;font-size:14px}#picTool button:hover{opacity:0.9}#picTool .btn-orange{background:#ff9f00;color:#fff}#picTool .btn-red{background:#e53935;color:#fff}#picTool .btn-gray{background:#e2e8f0;color:#333}#picTool .btn-blue{background:#1B3A5C;color:#fff}#picTool .btn-green{background:#28a745;color:#fff}#picTool .log-box{background:#1B3A5C;color:#89e889;padding:12px;border-radius:6px;height:160px;overflow:auto;font-family:monospace;font-size:13px;margin-top:12px}#picTool .group-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}#picTool .group-card{border:1px solid #dce4f0;border-radius:8px;overflow:hidden;background:#F7F9FC}#picTool .group-header{background:#f7f9fc;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;flex-wrap:wrap}#picTool .group-header:hover{background:#eef3fa}#picTool .group-body{padding:10px;display:none;overflow-x:auto}#picTool .group-body.open{display:block}#picTool table{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}#picTool th,#picTool td{border:1px solid #EDF1F7;padding:7px;text-align:left;white-space:nowrap}#picTool th{background:#24507E;color:#fff}#picTool .single-table{width:100%;border-collapse:collapse;margin-top:12px}#picTool .single-table th,#picTool .single-table td{border:1px solid #EDF1F7;padding:8px}#picTool .tip-ok{background:#e6ffed;border:1px solid #8fd9a8;color:#137733;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:12px;line-height:1.6}#picTool .tip-error{background:#ffeaea;border:1px solid #ffb4b4;color:#b42424;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:10px}#picTool .main-warn-icon{color:#e53935;font-weight:bold;margin-right:4px}
 
 /* 表格溢出修复：窄容器下横向滚动，避免列错位压缩 */
-#picTool .page-card{overflow-x:auto}
+#picTool .page-card{overflow-x:auto;margin-top:16px;padding:20px;border-radius:10px}
 #picTool .single-table{min-width:720px}
 #picTool .single-table th,#picTool .single-table td{white-space:nowrap}
 
@@ -59,8 +59,6 @@ body{font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-se
 </div>
 <div class="page active" id="page-multi">
       <div class="page-card">
-        <h3>多ASIN文件夹分组打包 <span style="font-weight:normal;font-size:14px;color:#444">按文件夹名自动分组，ZIP内无文件夹层级</span></h3>
-        
         <div class="tip-ok">
           ✅ <strong>在线打开使用提示</strong>：选中多个商品文件夹，一起拖拽到左侧区域，即可批量自动分组。
           <br>本地双击打开请使用右侧「点击选择文件夹」，可多次点击追加分组。

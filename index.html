@@ -94,7 +94,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
     <header class="topbar">
       <div>
         <div class="crumb" id="crumb">工作台</div>
-        <h1 id="pageTitle">批量传图片</h1>
+        <h1 id="pageTitle">工作台 / AI工具：批量传图片</h1>
       </div>
       <div class="spacer"></div>
     </header>
@@ -128,8 +128,8 @@ function switchTool(key){
   const tool = TOOLS[key];
   if(!tool) return;
   frame.src = tool.file;
-  titleEl.textContent = tool.title;
-  crumbEl.textContent = tool.group + ' / ' + tool.title;
+  titleEl.textContent = `工作台 / ${tool.group}：${tool.title}`;
+  crumbEl.style.display = 'none';
   nav.querySelectorAll('a').forEach(a => a.classList.toggle('on', a.dataset.view === key));
 }
 
@@ -156,8 +156,8 @@ document.querySelectorAll('.grp').forEach(g => {
 
 // 默认选中第一个
 nav.querySelector('a').classList.add('on');
-titleEl.textContent = TOOLS['pic-multi'].title;
-crumbEl.textContent = TOOLS['pic-multi'].group + ' / ' + TOOLS['pic-multi'].title;
+titleEl.textContent = `工作台 / ${TOOLS['pic-multi'].group}：${TOOLS['pic-multi'].title}`;
+crumbEl.style.display = 'none';
 </script>
 </body>
 </html>
