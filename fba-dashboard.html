@@ -19,6 +19,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
   background:var(--bg);color:var(--text);font-size:13px;line-height:1.6;-webkit-font-smoothing:antialiased}
 .app{display:flex;min-height:100vh}
 .side{width:198px;flex-shrink:0;background:#131826;color:#c3cad9;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+html.embedded .side{display:none}
+html.embedded .crumb{display:none}
 .side .brand{padding:16px 16px 12px;font-size:13.5px;font-weight:600;color:#fff;border-bottom:1px solid #252c3d}
 .side .brand small{display:block;font-weight:400;font-size:10.5px;color:#6f7a91;margin-top:4px;line-height:1.5}
 .nav{padding:8px;flex:1;overflow:auto}
@@ -4263,6 +4265,19 @@ setTimeout(() => {
   if (state.view === 'forecast') renderForecastPage();
 }, 90);
 
+</script>
+<script>
+/* 嵌入模式：被门户 iframe 加载时隐藏自身侧边栏，支持 #v=板块 直达（data-v 标识为对接约定，改名前需同步门户菜单） */
+(function(){
+  let emb = false;
+  try{ emb = window.self !== window.top; }catch(e){ emb = true; }
+  if(!emb) return;
+  document.documentElement.classList.add('embedded');
+  const parse = () => { const m = (location.hash || '').match(/v=([a-z]+)/i); return (m && TITLES[m[1]]) ? m[1] : null; };
+  const v0 = parse();
+  if(v0) go(v0);
+  window.addEventListener('hashchange', () => { const v = parse(); if(v && state.view !== v) go(v); });
+})();
 </script>
 <div id="copyToast"></div>
 </body>

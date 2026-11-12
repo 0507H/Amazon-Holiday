@@ -35,7 +35,8 @@ a{text-decoration:none;color:inherit}
 .nav .row svg{flex:none;stroke:currentColor}
 .nav .row .badge{margin-left:auto;font-size:10px;color:#8FAFC4;border:1px solid rgba(255,255,255,.18);
   border-radius:9px;padding:0 6px;line-height:16px}
-.nav .sub-row{padding-left:30px;font-size:12px}
+.nav .sub-row{padding-left:30px;font-size:11.5px;height:auto;padding-top:4px;padding-bottom:4px}
+.nav .lbl2{font-size:11px;color:#5F7E96;padding:6px 8px 2px 16px}
 .nav .caret{margin-left:auto;transition:transform .15s;font-size:9px;color:#8FAFC4}
 .nav .caret.closed{transform:rotate(-90deg)}
 .nav .items.closed{display:none}
@@ -152,16 +153,41 @@ a{text-decoration:none;color:inherit}
         <div class="row sub-row" data-tool="date-fix"><span class="tx">批量改日期</span></div>
       </div>
 
-      <div class="row" data-tool="tasks">
+      <div class="row" id="grpTasks">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M8 9.5h8M8 14h5"/></svg>
         <span class="tx">任务管理</span>
-        <span class="badge" id="badgeTasks">待接入</span>
+        <span class="caret" id="caretTasks">▼</span>
+      </div>
+      <div class="items" id="tasksItems">
+        <div class="row sub-row" data-tool="tasks" data-sub="today"><span class="tx">今日</span></div>
+        <div class="row sub-row" data-tool="tasks" data-sub="month"><span class="tx">本月全量</span></div>
+        <div class="row sub-row" data-tool="tasks" data-sub="report"><span class="tx">报告</span></div>
+        <div class="row sub-row" data-tool="tasks" data-sub="data"><span class="tx">数据</span></div>
       </div>
 
-      <div class="row" data-tool="holiday">
+      <div class="row" id="grpHoliday">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M3 20V13M9 20V7M15 20V10M21 20V4"/></svg>
         <span class="tx">节日跟进</span>
-        <span class="badge" id="badgeHoliday">待接入</span>
+        <span class="caret" id="caretHoliday">▼</span>
+      </div>
+      <div class="items" id="holidayItems">
+        <div class="lbl2">总览</div>
+        <div class="row sub-row" data-tool="holiday" data-sub="dash"><span class="tx">经营看板</span></div>
+        <div class="row sub-row" data-tool="holiday" data-sub="alert"><span class="tx">预警中心</span></div>
+        <div class="row sub-row" data-tool="holiday" data-sub="todo"><span class="tx">任务待办</span></div>
+        <div class="lbl2">产品</div>
+        <div class="row sub-row" data-tool="holiday" data-sub="sku"><span class="tx">产品明细</span></div>
+        <div class="row sub-row" data-tool="holiday" data-sub="trend"><span class="tx">销售趋势</span></div>
+        <div class="row sub-row" data-tool="holiday" data-sub="price"><span class="tx">价格与利润</span></div>
+        <div class="row sub-row" data-tool="holiday" data-sub="ad"><span class="tx">广告效率</span></div>
+        <div class="row sub-row" data-tool="holiday" data-sub="stock"><span class="tx">库存消耗进度</span></div>
+        <div class="lbl2">节奏</div>
+        <div class="row sub-row" data-tool="holiday" data-sub="forecast"><span class="tx">销量预测</span></div>
+        <div class="row sub-row" data-tool="holiday" data-sub="season"><span class="tx">节日日历</span></div>
+        <div class="row sub-row" data-tool="holiday" data-sub="report"><span class="tx">日/周/月报</span></div>
+        <div class="lbl2">设置</div>
+        <div class="row sub-row" data-tool="holiday" data-sub="rule"><span class="tx">预警规则</span></div>
+        <div class="row sub-row" data-tool="holiday" data-sub="data"><span class="tx">数据源</span></div>
       </div>
     </nav>
 
@@ -425,9 +451,6 @@ function render(){
   if(week) f.push('本周还有 ' + week + ' 条任务到期');
   if(!f.length) f.push('暂无风险项，保持节奏');
   $('focusList').innerHTML = f.map(x => '<li>' + x + '</li>').join('');
-
-  $('badgeTasks').textContent = IS_DEMO ? '未录入' : '已接入';
-  $('badgeHoliday').textContent = '已接入';
 }
 
 function esc(s){
@@ -441,31 +464,30 @@ function clearOn(){ nav.querySelectorAll('.row').forEach(r => r.classList.remove
 function showHome(){
   wrap.classList.remove('on'); dash.classList.remove('hidden');
   clearOn(); nav.querySelector('[data-home]').classList.add('on');
-  setCrumb('首页驾驶舱'); frame.removeAttribute('src');
+  setCrumb('首页驾驶舱'); frame.removeAttribute('src'); curTool = null;
   document.title = '脆脆鲨·工作台';
   render();
 }
 
-function openTool(key){
+let curTool = null;
+function openTool(key, sub){
   const t = TOOLS[key];
   if(!t) return;
-  fetch(t.file, { method:'HEAD' }).then(r => {
-    if(!r.ok){
-      alert('「' + t.title + '」还没接入，敬请期待');
-      showHome();
-      return;
-    }
-    clearOn();
-    const el = nav.querySelector('[data-tool="' + key + '"]');
-    if(el) el.classList.add('on');
-    dash.classList.add('hidden'); wrap.classList.add('on');
-    frame.src = t.file;
-    setCrumb(t.group + ' · ' + t.title);
-    document.title = t.title + ' · 脆脆鲨工作台';
-  }).catch(() => {
-    alert('「' + t.title + '」加载失败');
-    showHome();
-  });
+  const hash = sub ? (key === 'tasks' ? '#tab=' : '#v=') + sub : '';
+  clearOn();
+  const el = nav.querySelector('[data-tool="' + key + '"]' + (sub ? '[data-sub="' + sub + '"]' : ''));
+  if(el) el.classList.add('on');
+  dash.classList.add('hidden'); wrap.classList.add('on');
+  if(curTool === key){
+    try{ frame.contentWindow.location.hash = hash; }
+    catch(e){ frame.src = t.file + hash; }
+  } else {
+    frame.src = t.file + hash;
+  }
+  curTool = key;
+  const subT = el ? el.querySelector('.tx').textContent : t.title;
+  setCrumb(t.group + ' · ' + (sub ? subT : t.title));
+  document.title = t.title + ' · 脆脆鲨工作台';
 }
 
 nav.addEventListener('click', (e) => {
@@ -477,7 +499,17 @@ nav.addEventListener('click', (e) => {
     $('caretTools').classList.toggle('closed');
     return;
   }
-  if(row.dataset.tool) openTool(row.dataset.tool);
+  if(row.id === 'grpTasks'){
+    $('tasksItems').classList.toggle('closed');
+    $('caretTasks').classList.toggle('closed');
+    return;
+  }
+  if(row.id === 'grpHoliday'){
+    $('holidayItems').classList.toggle('closed');
+    $('caretHoliday').classList.toggle('closed');
+    return;
+  }
+  if(row.dataset.tool) openTool(row.dataset.tool, row.dataset.sub);
 });
 
 document.querySelectorAll('.q-item').forEach(q => {

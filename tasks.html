@@ -16,6 +16,8 @@
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
   background:var(--bg);color:var(--t1);font-size:13px;line-height:1.6;-webkit-font-smoothing:antialiased;padding:16px 20px 26px}
 .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+html.embedded .hd>div:first-child{display:none}
+html.embedded .hd{justify-content:flex-end;margin-bottom:6px}
 .hd h1{font-size:15px;font-weight:500}
 .hd .sub{font-size:12px;color:var(--t2);margin-top:3px}
 .hd .act{display:flex;gap:8px;align-items:center}
@@ -478,13 +480,14 @@ $('mSave').addEventListener('click', () => {
 });
 
 /* ---------- 交互 ---------- */
-document.querySelectorAll('.tab').forEach(tb => tb.addEventListener('click', () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
-  tb.classList.add('on');
-  ['today','month','report','data'].forEach(k => $('view' + k[0].toUpperCase() + k.slice(1)).style.display = k === tb.dataset.tab ? '' : 'none');
-  if(tb.dataset.tab === 'report') renderReport();
-  if(tb.dataset.tab === 'data') renderData();
-}));
+function switchTab(k){
+  if(!['today','month','report','data'].includes(k)) return;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.dataset.tab === k));
+  ['today','month','report','data'].forEach(kk => $('view' + kk[0].toUpperCase() + kk.slice(1)).style.display = kk === k ? '' : 'none');
+  if(k === 'report') renderReport();
+  if(k === 'data') renderData();
+}
+document.querySelectorAll('.tab').forEach(tb => tb.addEventListener('click', () => switchTab(tb.dataset.tab)));
 
 document.body.addEventListener('click', (e) => {
   const chk = e.target.closest('[data-check]');
@@ -538,6 +541,18 @@ function renderAll(){ renderActive(); if(document.querySelector('.tab.on').datas
   $('subTitle').textContent = (SEED ? SEED.month : now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0'))
     + ' · 共 ' + TASKS.length + ' 条任务 · 数据保存在本浏览器';
   renderToday();
+})();
+
+/* ---------- 嵌入模式：被门户 iframe 加载时隐藏自带页头，支持 #tab= 直达 ---------- */
+(function(){
+  let emb = false;
+  try{ emb = window.self !== window.top; }catch(e){ emb = true; }
+  if(!emb) return;
+  document.documentElement.classList.add('embedded');
+  const parse = () => { const m = (location.hash || '').match(/tab=(today|month|report|data)/); return m ? m[1] : null; };
+  const t0 = parse();
+  if(t0) switchTab(t0);
+  window.addEventListener('hashchange', () => { const t = parse(); if(t && t !== document.querySelector('.tab.on').dataset.tab) switchTab(t); });
 })();
 </script>
 </body>
