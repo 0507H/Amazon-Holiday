@@ -173,7 +173,7 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
     <div class="s-row" data-v="pt">父体</div>
     <div class="s-row" data-v="sku">单品</div>
     <div class="s-row" data-v="dt">数据</div>
-    <div class="s-row" data-v="rep">报告</div>
+    <div class="s-row" data-v="rep">日/周/月报</div>
     <div class="s-row" data-v="data">数据管理</div>
   </nav>
   <div class="s-foot">单文件自包含<br>可离线 · 可分享</div>
@@ -425,7 +425,7 @@ function vOv(){
       <b>使用说明</b><br>
       · 点击店铺卡进入店铺层 → 品类 → 父体 → 单品按日明细；「数据管理」可导入新的积加 Excel 或调整月度目标<br>
       · 进度条上的深色竖线 = 月时间进度参照；退款率 8% 为预警线<br>
-      · 周报 / 月报文案模板待样例后接入导出（当前「报告」页提供周期汇总数据）
+      · 周报 / 月报文案模板待样例后接入导出（当前「日/周/月报」页提供周期汇总数据）
     </div>`;
 }
 
@@ -870,7 +870,7 @@ async function applySummaryXlsx(file){
 
 /* ================= 视图：报告 ================= */
 function vRep(){
-  $crumbV.textContent = '报告';
+  $crumbV.textContent = '日/周/月报';
   const md = DB.monthDays || 30;
   /* 7天为一周分块 */
   const weeks = [];
@@ -893,7 +893,7 @@ function vRep(){
   });
 
   $app.innerHTML = `
-    ${crumbHtml([{label:'报告', v:'rep'}])}
+    ${crumbHtml([{label:'日/周/月报', v:'rep'}])}
     <div class="dnote">周 / 月周期汇总数据 · <b>周报与月报的文案模板待样例后接入导出</b>，当前页面先行提供汇报所需的核心数字</div>
     <div class="sec"><div class="sec-h"><h2>周期汇总（整体）</h2><span class="hint">7 天为一周 · 按数据起始日切分</span></div>
       <div class="panel"><table><thead><tr><th>周期</th><th class="r">天数</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th class="r">退款</th></tr></thead><tbody>
