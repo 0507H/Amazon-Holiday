@@ -167,14 +167,12 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
     <div><div class="nm">脆脆鲨</div><div class="sub">月度跟进</div></div>
   </div>
   <nav>
-    <div class="s-lbl">拆解链路</div>
-    <div class="s-row" data-v="ov">① 总览</div>
-    <div class="s-row" data-v="st">② 店铺</div>
-    <div class="s-row" data-v="cat">③ 品类</div>
-    <div class="s-row" data-v="pt">④ 父体</div>
-    <div class="s-row" data-v="sku">⑤ 单品</div>
-    <div class="s-row" data-v="dt">⑥ 数据层面</div>
-    <div class="s-lbl">工具</div>
+    <div class="s-row" data-v="ov">总览</div>
+    <div class="s-row" data-v="st">店铺</div>
+    <div class="s-row" data-v="cat">品类</div>
+    <div class="s-row" data-v="pt">父体</div>
+    <div class="s-row" data-v="sku">单品</div>
+    <div class="s-row" data-v="dt">数据</div>
     <div class="s-row" data-v="rep">报告</div>
     <div class="s-row" data-v="data">数据管理</div>
   </nav>
@@ -433,7 +431,7 @@ function vOv(){
 
 /* ================= 拆解链路：总览→店铺→品类→父体→单品→数据层面（平级） ================= */
 function levelCrumb(st, cur){
-  const steps = [['ov','总览'],['st','店铺'],['cat','品类'],['pt','父体'],['sku','单品'],['dt','数据层面']];
+  const steps = [['ov','总览'],['st','店铺'],['cat','品类'],['pt','父体'],['sku','单品'],['dt','数据']];
   return '<div class="dcrumb">' + steps.map(s => {
     if(s[0] === cur) return `<span class="c on">${s[1]}</span>`;
     return `<span class="c lit" data-v="${s[0]}"${s[0] === 'ov' ? '' : ` data-st="${st}"`}>${s[1]}</span>`;
@@ -472,13 +470,13 @@ function vStore(st){
   $app.innerHTML = `
     ${levelCrumb(st, 'st')}
     ${storeTabs(st, 'st')}
-    <div class="dnote">${nm} · 实际 ${DB.days[0]}~${DB.days[DB.days.length-1]} · 目标指标只考核销量+利润，其他维度辅助总结 · 退款单品行可进入数据层面</div>
+    <div class="dnote">${nm} · 实际 ${DB.days[0]}~${DB.days[DB.days.length-1]} · 目标指标只考核销量+利润，其他维度辅助总结 · 退款单品行可进入数据页</div>
     <div class="sec"><div class="grid4">${rateKpis(a, t, nm)}</div></div>
     <div class="charts">
       ${chartCard('日销量（件）', numStr(a.u) + ' 件', svgBars(bd.map(d => d.u), '#1BA3B8'))}
       ${chartCard('日净毛利（$）', money(a.p), svgLine(bd.map(d => d.p), a.p >= 0 ? '#2E9E6B' : '#B8423A'))}
     </div>
-    ${refTop.length ? `<div class="sec"><div class="sec-h"><h2>退款 TOP5 单品</h2><span class="hint">按退款量排序 · 点击进入数据层面</span></div>
+    ${refTop.length ? `<div class="sec"><div class="sec-h"><h2>退款 TOP5 单品</h2><span class="hint">按退款量排序 · 点击进入数据页</span></div>
       <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">销量</th><th class="r">退款量</th><th class="r">退款/销量</th></tr></thead><tbody>
       ${refTop.map(x => `<tr class="rowbtn" data-v="dt" data-st="${st}" data-a="${x.ai}">
         <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
@@ -572,7 +570,7 @@ function vSkuPage(st, pa){
       <span style="font-size:12px;color:var(--sub)">父体筛选</span>
       ${selHtml(st, 'sku', 'pa', '全部父体', paOpts, paSel)}
     </div>
-    <div class="dnote" style="margin-top:8px">共 ${skus.length} 个单品 · 点击单品行进入数据层面（按日明细逐字段）</div>
+    <div class="dnote" style="margin-top:8px">共 ${skus.length} 个单品 · 点击单品行进入数据页（按日明细逐字段）</div>
     <div class="sec"><div class="sec-h"><h2>单品排行</h2><span class="hint">按净毛利排序</span></div>
       <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
       ${skus.map(x => `<tr class="rowbtn" data-v="dt" data-st="${st}" data-a="${x.ai}">
@@ -586,7 +584,7 @@ function vSkuPage(st, pa){
 
 /* 数据层面：单 ASIN 按日明细逐字段 */
 function vDetail(st, a){
-  $crumbV.textContent = '数据层面';
+  $crumbV.textContent = '数据';
   const storeRows = DB.rows.filter(r => r[F.st] === st);
   const ranked = [...groupBy(storeRows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
   if(a === undefined || a === '' || DB.asins[Number(a)] === undefined || !storeRows.some(r => r[F.a] === Number(a))){
