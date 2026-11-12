@@ -103,6 +103,11 @@ html.embedded .top{display:none}
 .dcrumb .c.on{background:var(--navy);color:#fff;font-weight:600;cursor:default}
 .dcrumb .c.lit:hover{background:#EDF3F8;color:var(--navy)}
 .dcrumb .a{color:#B9C9D6;font-size:11px}
+.stabs{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.stab{padding:7px 16px;border-radius:8px;background:#fff;border:1px solid var(--line);font-size:13px;color:var(--sub);cursor:pointer}
+.stab:hover{border-color:var(--teal)}
+.stab.on{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600;cursor:default}
+.sel{border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;background:#fff;color:var(--ink);font-family:inherit;max-width:460px}
 .dnote{margin-top:8px;font-size:12px;color:var(--faint);line-height:1.8}
 .dnote b{color:var(--amber)}
 
@@ -158,12 +163,13 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
     <div><div class="nm">脆脆鲨</div><div class="sub">月度跟进</div></div>
   </div>
   <nav>
-    <div class="s-lbl">导航</div>
-    <div class="s-row" data-v="ov">目标总览</div>
-    <div class="s-lbl">店铺钻取</div>
-    <div class="s-row" data-v="st" data-st="0">AvanUS</div>
-    <div class="s-row" data-v="st" data-st="1">TakealookoUS</div>
-    <div class="s-row" data-v="st" data-st="2">TivorazakiUS</div>
+    <div class="s-lbl">拆解链路</div>
+    <div class="s-row" data-v="ov">① 总览</div>
+    <div class="s-row" data-v="st">② 店铺</div>
+    <div class="s-row" data-v="cat">③ 品类</div>
+    <div class="s-row" data-v="pt">④ 父体</div>
+    <div class="s-row" data-v="sku">⑤ 单品</div>
+    <div class="s-row" data-v="dt">⑥ 数据层面</div>
     <div class="s-lbl">工具</div>
     <div class="s-row" data-v="rep">报告</div>
     <div class="s-row" data-v="data">数据管理</div>
@@ -286,6 +292,13 @@ $app.addEventListener('click', e => {
   if(el.dataset.a !== undefined) q.a = el.dataset.a;
   navTo(q);
 });
+$app.addEventListener('change', e => {
+  const el = e.target.closest('select[data-nav]');
+  if(!el) return;
+  const q = { v: el.dataset.v, st: Number(el.dataset.st) || 0 };
+  if(el.value !== 'all') q[el.dataset.param] = el.value;
+  navTo(q);
+});
 document.getElementById('sideNav').addEventListener('click', e => {
   const el = e.target.closest('[data-v]');
   if(!el) return;
@@ -295,11 +308,8 @@ document.getElementById('sideNav').addEventListener('click', e => {
 });
 function syncSide(v, q){
   document.querySelectorAll('#sideNav .s-row').forEach(r => r.classList.remove('on'));
-  let sel = null;
-  if(v === 'ov') sel = '#sideNav .s-row[data-v="ov"]';
-  else if(v === 'rep') sel = '#sideNav .s-row[data-v="rep"]';
-  else if(v === 'data') sel = '#sideNav .s-row[data-v="data"]';
-  else if(['st','cat','pt','sku'].includes(v)) sel = '#sideNav .s-row[data-v="st"][data-st="' + (q.st || 0) + '"]';
+  const map = {ov:'ov', st:'st', cat:'cat', pt:'pt', sku:'sku', dt:'dt', rep:'rep', data:'data'};
+  const sel = map[v] ? `#sideNav .s-row[data-v="${map[v]}"]` : null;
   if(sel){ const el = document.querySelector(sel); if(el) el.classList.add('on'); }
 }
 window.addEventListener('hashchange', render);
@@ -417,87 +427,116 @@ function vOv(){
     </div>`;
 }
 
-/* ================= 视图：店铺 ================= */
+/* ================= 拆解链路：总览→店铺→品类→父体→单品→数据层面（平级） ================= */
+function levelCrumb(st, cur){
+  const steps = [['ov','总览'],['st','店铺'],['cat','品类'],['pt','父体'],['sku','单品'],['dt','数据层面']];
+  return '<div class="dcrumb">' + steps.map(s => {
+    if(s[0] === cur) return `<span class="c on">${s[1]}</span>`;
+    return `<span class="c lit" data-v="${s[0]}"${s[0] === 'ov' ? '' : ` data-st="${st}"`}>${s[1]}</span>`;
+  }).join('<span class="a">▸</span>') + '</div>';
+}
+function storeTabs(st, v){
+  return '<div class="stabs">' + DB.stores.map((nm, i) =>
+    `<span class="stab ${i === st ? 'on' : ''}" data-v="${v}" data-st="${i}">${esc(nm)}</span>`).join('') + '</div>';
+}
+function selHtml(st, navV, paramKey, placeholder, opts, cur){
+  return `<select class="sel" data-nav="1" data-v="${navV}" data-st="${st}" data-param="${paramKey}">
+    <option value="all">${placeholder}</option>
+    ${opts.map(o => `<option value="${o.v}"${String(o.v) === String(cur) ? ' selected' : ''}>${esc(o.lb)}</option>`).join('')}
+  </select>`;
+}
+function repNameOf(rows, pi){
+  let best = -1, bi = 0;
+  groupBy(rows.filter(r => r[F.pa] === pi), F.a).forEach((ars, ai) => {
+    const u = agg(ars).u; if(u > best){ best = u; bi = ai; }
+  });
+  return DB.names[bi];
+}
+
+/* 店铺层 */
 function vStore(st){
   const nm = DB.stores[st];
   if(nm === undefined){ navTo({v:'ov'}); return; }
-  $crumbV.textContent = nm;
+  $crumbV.textContent = '店铺 · ' + nm;
   const rows = DB.rows.filter(r => r[F.st] === st);
   const a = agg(rows), t = tgtOf(st);
   const bd = byDay(rows);
-  const cats = groupBy(rows, F.cat);
-  const catList = [...cats.entries()].map(([ci, rs]) => ({ci, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
-  const maxP = Math.max(...catList.map(x => Math.abs(x.a.p)), 1);
 
-  /* 退款TOP5单品 */
   const refTop = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)}))
     .filter(x => x.a.rf > 0).sort((x,y) => y.a.rf - x.a.rf).slice(0, 5);
 
   $app.innerHTML = `
-    ${crumbHtml([
-      {label:'总览', v:'ov'},
-      {label:nm + ' · 品类', v:'st', attrs:`data-st="${st}"`}
-    ])}
-    <div class="dnote">${nm} · 实际 ${DB.days[0]}~${DB.days[DB.days.length-1]} · 点击品类行继续下钻到父体 / 单品</div>
+    ${levelCrumb(st, 'st')}
+    ${storeTabs(st, 'st')}
+    <div class="dnote">${nm} · 实际 ${DB.days[0]}~${DB.days[DB.days.length-1]} · 目标指标只考核销量+利润，其他维度辅助总结 · 退款单品行可进入数据层面</div>
     <div class="sec"><div class="grid4">${rateKpis(a, t, nm)}</div></div>
     <div class="charts">
       ${chartCard('日销量（件）', numStr(a.u) + ' 件', svgBars(bd.map(d => d.u), '#1BA3B8'))}
       ${chartCard('日净毛利（$）', money(a.p), svgLine(bd.map(d => d.p), a.p >= 0 ? '#2E9E6B' : '#B8423A'))}
     </div>
-    ${refTop.length ? `<div class="sec"><div class="sec-h"><h2>退款 TOP5 单品</h2><span class="hint">按退款量排序</span></div>
+    ${refTop.length ? `<div class="sec"><div class="sec-h"><h2>退款 TOP5 单品</h2><span class="hint">按退款量排序 · 点击进入数据层面</span></div>
       <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">销量</th><th class="r">退款量</th><th class="r">退款/销量</th></tr></thead><tbody>
-      ${refTop.map(x => `<tr class="rowbtn" data-v="sku" data-st="${st}" data-c="${DB.rows.find(r=>r[F.a]===x.ai)[F.cat]}" data-pa="${DB.rows.find(r=>r[F.a]===x.ai)[F.pa]}" data-a="${x.ai}">
+      ${refTop.map(x => `<tr class="rowbtn" data-v="dt" data-st="${st}" data-a="${x.ai}">
         <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
         <td class="r">${numStr(x.a.u)}</td><td class="r dn">${numStr(x.a.rf)}</td><td class="r">${x.a.u ? pctStr(x.a.rf/x.a.u*100) : '-'}</td></tr>`).join('')}
-      </tbody></table></div></div>` : ''}
-    <div class="sec"><div class="sec-h"><h2>品类排行</h2><span class="hint">按净毛利排序 · 品类层无单月目标，日均 500+ 件仅作方向参考</span></div>
-      <div class="panel"><table><thead><tr><th>品类</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
-      ${catList.map(x => `<tr class="rowbtn" data-v="cat" data-st="${st}" data-c="${x.ci}">
+      </tbody></table></div></div>` : ''}`;
+}
+
+/* 品类层 */
+function vCatPage(st){
+  const nm = DB.stores[st];
+  $crumbV.textContent = '品类';
+  const rows = DB.rows.filter(r => r[F.st] === st);
+  const a = agg(rows);
+  const catList = [...groupBy(rows, F.cat).entries()].map(([ci, rs]) => ({ci, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
+  const maxP = Math.max(...catList.map(x => Math.abs(x.a.p)), 1);
+
+  $app.innerHTML = `
+    ${levelCrumb(st, 'cat')}
+    ${storeTabs(st, 'cat')}
+    <div class="dnote">${nm} · 品类层无单月目标，日均 500+ 件仅作方向参考 · 点击品类行进入父体层</div>
+    <div class="sec"><div class="sec-h"><h2>品类排行</h2><span class="hint">按净毛利排序</span></div>
+      <div class="panel"><table><thead><tr><th>品类</th><th class="r">销量</th><th class="r">日均</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
+      ${catList.map(x => `<tr class="rowbtn" data-v="pt" data-st="${st}" data-c="${x.ci}">
         <td class="tname">${esc(DB.cats[x.ci])}</td>
-        <td class="r">${numStr(x.a.u)}</td><td class="r">${money(x.a.s)}</td>
+        <td class="r">${numStr(x.a.u)}</td>
+        <td class="r">${numStr(x.a.u/DB.days.length)}</td>
+        <td class="r">${money(x.a.s)}</td>
         <td class="r ${x.a.p>=0?'up':'dn'}">${money(x.a.p)}</td>
         <td class="r gm ${gmCls(x.a.gm)}">${pctStr(x.a.gm)}</td>
         <td>${barCell(x.a.p, maxP)}</td></tr>`).join('')}
-      <tr class="tot"><td class="tname">合计</td><td class="r">${numStr(a.u)}</td><td class="r">${money(a.s)}</td><td class="r ${a.p>=0?'up':'dn'}">${money(a.p)}</td><td class="r gm ${gmCls(a.gm)}">${pctStr(a.gm)}</td><td></td></tr>
+      <tr class="tot"><td class="tname">合计</td><td class="r">${numStr(a.u)}</td><td class="r">${numStr(a.u/DB.days.length)}</td><td class="r">${money(a.s)}</td><td class="r ${a.p>=0?'up':'dn'}">${money(a.p)}</td><td class="r gm ${gmCls(a.gm)}">${pctStr(a.gm)}</td><td></td></tr>
       </tbody></table></div></div>`;
 }
 
-/* ================= 视图：品类 ================= */
-function vCat(st, ci){
-  const nm = DB.stores[st], cn = DB.cats[ci];
-  $crumbV.textContent = cn;
-  const rows = DB.rows.filter(r => r[F.st] === st && r[F.cat] === ci);
-  const a = agg(rows), t = tgtOf(st);
-  const bd = byDay(rows);
+/* 父体层 */
+function vParentPage(st, c){
+  $crumbV.textContent = '父体';
+  const storeRows = DB.rows.filter(r => r[F.st] === st);
+  let rows = storeRows, catSel = 'all';
+  if(c !== undefined && c !== '' && DB.cats[Number(c)] !== undefined){
+    rows = storeRows.filter(r => r[F.cat] === Number(c));
+    catSel = Number(c);
+  }
+  const catOpts = [...groupBy(storeRows, F.cat).entries()].map(([ci, rs]) => ({ci, p: agg(rs).p, u: agg(rs).u}))
+    .sort((x, y) => y.p - x.p).map(o => ({v: o.ci, lb: DB.cats[o.ci] + '（' + numStr(o.u) + ' 件）'}));
   const pars = [...groupBy(rows, F.pa).entries()].map(([pi, rs]) => {
     const pa = agg(rs);
-    /* 代表名：组内销量最大单品的名称 */
-    let best = -1, bi = 0;
-    groupBy(rs, F.a).forEach((ars, ai) => { const u = agg(ars).u; if(u > best){ best = u; bi = ai; } });
-    return {pi, pa, rep: DB.names[bi]};
+    return {pi, pa, rep: repNameOf(rows, pi)};
   }).sort((x,y) => y.pa.p - x.pa.p);
   const maxP = Math.max(...pars.map(x => Math.abs(x.pa.p)), 1);
 
   $app.innerHTML = `
-    ${crumbHtml([
-      {label:'总览', v:'ov'},
-      {label:nm, v:'st', attrs:`data-st="${st}"`},
-      {label:cn + ' · 父体', v:'cat', attrs:`data-st="${st}" data-c="${ci}"`}
-    ])}
-    <div class="dnote">品类「${esc(cn)}」 · 点击父体行下钻到单品按日明细</div>
-    <div class="sec"><div class="grid4">
-      ${kpiCard('', IC.trend, '销量', `${numStr(a.u)}<small>  件</small>`, `日均 ${numStr(a.u/DB.days.length)} 件${a.u/(DB.days.length)>=500 ? ' · 已达 500+/天 方向线' : ''}`)}
-      ${kpiCard('', IC.coin, '销售额', money(a.s), `订单 ${numStr(a.ord)} · 客单 ${a.ord?money(a.s/a.ord,2):'-'}`)}
-      ${kpiCard(gmCls(a.gm)==='up'?'':(gmCls(a.gm)==='wn'?'mid':'warn'), IC.pct, '净毛利', `<span class="${gmCls(a.gm)}">${money(a.p)}</span>`, `净毛利率 ${pctStr(a.gm)}（店铺目标 ${t.g}%，品类层不考核）`)}
-      ${kpiCard(a.rf/Math.max(a.u,1)>0.08?'warn':'mid', IC.refund, '退款', `${numStr(a.rf)}<small>  件 · ${a.u?pctStr(a.rf/a.u*100):'0%'}</small>`, `广告花费 ${money(a.ad)} · ACOS ${a.ads?pctStr(a.ad/a.ads*100):'-'}`)}
-    </div></div>
-    <div class="charts">
-      ${chartCard('日销量（件）', numStr(a.u) + ' 件', svgBars(bd.map(d => d.u), '#1BA3B8'))}
-      ${chartCard('日净毛利（$）', money(a.p), svgLine(bd.map(d => d.p), a.p >= 0 ? '#2E9E6B' : '#B8423A'))}
+    ${levelCrumb(st, 'pt')}
+    ${storeTabs(st, 'pt')}
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <span style="font-size:12px;color:var(--sub)">品类筛选</span>
+      ${selHtml(st, 'pt', 'c', '全部品类', catOpts, catSel)}
     </div>
-    <div class="sec"><div class="sec-h"><h2>父体排行</h2><span class="hint">按净毛利排序 · 父产品名称为"-"的按 父ASIN→ASIN 兜底归组</span></div>
+    <div class="dnote" style="margin-top:8px">父产品名称为"-"的按 父ASIN→ASIN 兜底归组 · 点击父体行进入单品层</div>
+    <div class="sec"><div class="sec-h"><h2>父体排行</h2><span class="hint">按净毛利排序 · 共 ${pars.length} 个父体</span></div>
       <div class="panel"><table><thead><tr><th>父体（代表单品）</th><th>父ASIN</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
-      ${pars.map(x => `<tr class="rowbtn" data-v="pt" data-st="${st}" data-c="${ci}" data-pa="${x.pi}">
+      ${pars.map(x => `<tr class="rowbtn" data-v="sku" data-st="${st}" data-pa="${x.pi}">
         <td class="tname">${esc(x.rep)}</td><td class="asin">${esc(DB.parents[x.pi])}</td>
         <td class="r">${numStr(x.pa.u)}</td><td class="r">${money(x.pa.s)}</td>
         <td class="r ${x.pa.p>=0?'up':'dn'}">${money(x.pa.p)}</td>
@@ -506,37 +545,33 @@ function vCat(st, ci){
       </tbody></table></div></div>`;
 }
 
-/* ================= 视图：父体 ================= */
-function vParent(st, ci, pi){
-  const nm = DB.stores[st], cn = DB.cats[ci], pn = DB.parents[pi];
-  $crumbV.textContent = '父体 ' + pn;
-  const rows = DB.rows.filter(r => r[F.st] === st && r[F.cat] === ci && r[F.pa] === pi);
-  const a = agg(rows);
-  const bd = byDay(rows);
+/* 单品层 */
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function vSkuPage(st, pa){
+  $crumbV.textContent = '单品';
+  const storeRows = DB.rows.filter(r => r[F.st] === st);
+  let rows = storeRows, paSel = 'all';
+  if(pa !== undefined && pa !== '' && DB.parents[Number(pa)] !== undefined){
+    rows = storeRows.filter(r => r[F.pa] === Number(pa));
+    paSel = Number(pa);
+  }
+  const paOpts = [...groupBy(storeRows, F.pa).entries()].map(([pi, rs]) => ({pi, p: agg(rs).p}))
+    .sort((x, y) => y.p - x.p)
+    .map(o => ({v: o.pi, lb: repNameOf(storeRows, o.pi).slice(0, 22) + ' · ' + DB.parents[o.pi]}));
   const skus = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
   const maxP = Math.max(...skus.map(x => Math.abs(x.a.p)), 1);
 
   $app.innerHTML = `
-    ${crumbHtml([
-      {label:'总览', v:'ov'},
-      {label:nm, v:'st', attrs:`data-st="${st}"`},
-      {label:cn, v:'cat', attrs:`data-st="${st}" data-c="${ci}"`},
-      {label:'父体 ' + pn.slice(0,10) + '… · 单品', v:'pt', attrs:`data-st="${st}" data-c="${ci}" data-pa="${pi}"`}
-    ])}
-    <div class="dnote">父体 ${esc(pn)} · 点击单品行查看按日明细（销量 / 毛利 / 广告 / 费用逐字段）</div>
-    <div class="sec"><div class="grid4">
-      ${kpiCard('', IC.trend, '销量', `${numStr(a.u)}<small>  件</small>`, `日均 ${numStr(a.u/DB.days.length)} 件`)}
-      ${kpiCard('', IC.coin, '销售额', money(a.s), `订单 ${numStr(a.ord)} · Sessions ${numStr(a.ses)}`)}
-      ${kpiCard(gmCls(a.gm)==='up'?'':(gmCls(a.gm)==='wn'?'mid':'warn'), IC.pct, '净毛利', `<span class="${gmCls(a.gm)}">${money(a.p)}</span>`, `净毛利率 ${pctStr(a.gm)}`)}
-      ${kpiCard(a.rf/Math.max(a.u,1)>0.08?'warn':'mid', IC.refund, '退款', `${numStr(a.rf)}<small>  件 · ${a.u?pctStr(a.rf/a.u*100):'0%'}</small>`, `广告 ACOS ${a.ads?pctStr(a.ad/a.ads*100):'-'}`)}
-    </div></div>
-    <div class="charts">
-      ${chartCard('日销量（件）', numStr(a.u) + ' 件', svgBars(bd.map(d => d.u), '#1BA3B8'))}
-      ${chartCard('日净毛利（$）', money(a.p), svgLine(bd.map(d => d.p), a.p >= 0 ? '#2E9E6B' : '#B8423A'))}
+    ${levelCrumb(st, 'sku')}
+    ${storeTabs(st, 'sku')}
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <span style="font-size:12px;color:var(--sub)">父体筛选</span>
+      ${selHtml(st, 'sku', 'pa', '全部父体', paOpts, paSel)}
     </div>
+    <div class="dnote" style="margin-top:8px">共 ${skus.length} 个单品 · 点击单品行进入数据层面（按日明细逐字段）</div>
     <div class="sec"><div class="sec-h"><h2>单品排行</h2><span class="hint">按净毛利排序</span></div>
       <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
-      ${skus.map(x => `<tr class="rowbtn" data-v="sku" data-st="${st}" data-c="${ci}" data-pa="${pi}" data-a="${x.ai}">
+      ${skus.map(x => `<tr class="rowbtn" data-v="dt" data-st="${st}" data-a="${x.ai}">
         <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
         <td class="r">${numStr(x.a.u)}</td><td class="r">${money(x.a.s)}</td>
         <td class="r ${x.a.p>=0?'up':'dn'}">${money(x.a.p)}</td>
@@ -545,34 +580,41 @@ function vParent(st, ci, pi){
       </tbody></table></div></div>`;
 }
 
-/* ================= 视图：单品（数据明细） ================= */
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function vSku(st, ci, pi, ai){
-  const asin = DB.asins[ai];
-  $crumbV.textContent = asin;
-  const rows = DB.rows.filter(r => r[F.a] === ai).sort((x,y) => x[F.d] - y[F.d]);
-  const a = agg(rows);
+/* 数据层面：单 ASIN 按日明细逐字段 */
+function vDetail(st, a){
+  $crumbV.textContent = '数据层面';
+  const storeRows = DB.rows.filter(r => r[F.st] === st);
+  const ranked = [...groupBy(storeRows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
+  if(a === undefined || a === '' || DB.asins[Number(a)] === undefined || !storeRows.some(r => r[F.a] === Number(a))){
+    a = ranked.length ? ranked[0].ai : null;
+  } else a = Number(a);
+  if(a === null){
+    $app.innerHTML = levelCrumb(st,'dt') + storeTabs(st,'dt') + '<div class="panel">该店铺无数据</div>';
+    return;
+  }
+  const rows = DB.rows.filter(r => r[F.a] === a).sort((x,y) => x[F.d] - y[F.d]);
+  const aggA = agg(rows);
   const bd = byDay(rows);
-  const inv = (DB.inv && DB.inv[ai]) || [0, 0];
+  const inv = (DB.inv && DB.inv[a]) || [0, 0];
+  const asin = DB.asins[a];
 
   $app.innerHTML = `
-    ${crumbHtml([
-      {label:'总览', v:'ov'},
-      {label:DB.stores[st], v:'st', attrs:`data-st="${st}"`},
-      {label:DB.cats[ci], v:'cat', attrs:`data-st="${st}" data-c="${ci}"`},
-      {label:'父体 ' + DB.parents[pi].slice(0,10) + '…', v:'pt', attrs:`data-st="${st}" data-c="${ci}" data-pa="${pi}"`},
-      {label:'单品 ' + asin + ' · 按日明细', v:'sku', attrs:`data-st="${st}" data-c="${ci}" data-pa="${pi}" data-a="${ai}"`}
-    ])}
-    <div class="dnote"><b>${esc(DB.names[ai])}</b> · ${asin}</div>
+    ${levelCrumb(st, 'dt')}
+    ${storeTabs(st, 'dt')}
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <span style="font-size:12px;color:var(--sub)">选择单品</span>
+      ${selHtml(st, 'dt', 'a', '选择单品', ranked.map(x => ({v: x.ai, lb: DB.asins[x.ai] + ' · ' + DB.names[x.ai].slice(0, 24)})), a)}
+    </div>
+    <div class="dnote" style="margin-top:8px"><b>${esc(DB.names[a])}</b> · ${asin} · 按日明细（销量 / 毛利 / 广告 / 费用逐字段）</div>
     <div class="sec"><div class="grid4">
-      ${kpiCard('', IC.trend, '销量', `${numStr(a.u)}<small>  件</small>`, `订单 ${numStr(a.ord)} · Sessions ${numStr(a.ses)}`)}
-      ${kpiCard('', IC.coin, '销售额', money(a.s), `总收入 ${money(a.rev)} · 总支出 ${money(a.exp)}`)}
-      ${kpiCard(gmCls(a.gm)==='up'?'':(gmCls(a.gm)==='wn'?'mid':'warn'), IC.pct, '净毛利', `<span class="${gmCls(a.gm)}">${money(a.p)}</span>`, `净毛利率 ${pctStr(a.gm)} · ROI ${a.exp ? (a.rev/a.exp).toFixed(2) : '-'}`)}
-      ${kpiCard(a.rf/Math.max(a.u,1)>0.08?'warn':'mid', IC.refund, '退款', `${numStr(a.rf)}<small>  件 · ${a.u?pctStr(a.rf/a.u*100):'0%'}</small>`, `FBA可售 ${numStr(inv[0])} 件 · 可售周转 ${inv[1] || '-'} 天`)}
+      ${kpiCard('', IC.trend, '销量', `${numStr(aggA.u)}<small>  件</small>`, `订单 ${numStr(aggA.ord)} · Sessions ${numStr(aggA.ses)}`)}
+      ${kpiCard('', IC.coin, '销售额', money(aggA.s), `总收入 ${money(aggA.rev)} · 总支出 ${money(aggA.exp)}`)}
+      ${kpiCard(gmCls(aggA.gm)==='up'?'':(gmCls(aggA.gm)==='wn'?'mid':'warn'), IC.pct, '净毛利', `<span class="${gmCls(aggA.gm)}">${money(aggA.p)}</span>`, `净毛利率 ${pctStr(aggA.gm)} · ROI ${aggA.exp ? (aggA.rev/aggA.exp).toFixed(2) : '-'}`)}
+      ${kpiCard(aggA.rf/Math.max(aggA.u,1)>0.08?'warn':'mid', IC.refund, '退款', `${numStr(aggA.rf)}<small>  件 · ${aggA.u?pctStr(aggA.rf/aggA.u*100):'0%'}</small>`, `FBA可售 ${numStr(inv[0])} 件 · 可售周转 ${inv[1] || '-'} 天`)}
     </div></div>
     <div class="charts">
-      ${chartCard('日净毛利（$）', money(a.p), svgLine(bd.map(d => d.p), a.p >= 0 ? '#2E9E6B' : '#B8423A'))}
-      ${chartCard('日销量（件）', numStr(a.u) + ' 件', svgBars(bd.map(d => d.u), '#1BA3B8'))}
+      ${chartCard('日净毛利（$）', money(aggA.p), svgLine(bd.map(d => d.p), aggA.p >= 0 ? '#2E9E6B' : '#B8423A'))}
+      ${chartCard('日销量（件）', numStr(aggA.u) + ' 件', svgBars(bd.map(d => d.u), '#1BA3B8'))}
     </div>
     <div class="sec"><div class="sec-h"><h2>按日明细</h2><span class="hint">销量 / 毛利 / 广告 / 费用逐字段</span></div>
       <div class="panel"><table><thead><tr>
@@ -594,13 +636,13 @@ function vSku(st, ci, pi, ai){
           <td class="r">${money(r[F.comm],2)}</td><td class="r">${money(r[F.cpn],2)}</td>
         </tr>`;
       }).join('')}
-      <tr class="tot"><td>合计</td><td class="r">${numStr(a.u)}</td><td class="r">${numStr(a.ord)}</td><td class="r">${numStr(a.ses)}</td>
-        <td class="r">${money(a.s,2)}</td><td class="r ${a.p>=0?'up':'dn'}">${money(a.p,2)}</td>
-        <td class="r gm ${gmCls(a.gm)}">${pctStr(a.gm)}</td><td class="r">${numStr(a.rf)}</td>
-        <td class="r">${money(a.ad,2)}</td><td class="r">${money(a.ads,2)}</td>
-        <td class="r">${a.ads?pctStr(a.ad/a.ads*100):'-'}</td>
-        <td class="r">${money(a.pur,2)}</td><td class="r">${money(a.fba,2)}</td>
-        <td class="r">${money(a.comm,2)}</td><td class="r">${money(a.cpn,2)}</td></tr>
+      <tr class="tot"><td>合计</td><td class="r">${numStr(aggA.u)}</td><td class="r">${numStr(aggA.ord)}</td><td class="r">${numStr(aggA.ses)}</td>
+        <td class="r">${money(aggA.s,2)}</td><td class="r ${aggA.p>=0?'up':'dn'}">${money(aggA.p,2)}</td>
+        <td class="r gm ${gmCls(aggA.gm)}">${pctStr(aggA.gm)}</td><td class="r">${numStr(aggA.rf)}</td>
+        <td class="r">${money(aggA.ad,2)}</td><td class="r">${money(aggA.ads,2)}</td>
+        <td class="r">${aggA.ads?pctStr(aggA.ad/aggA.ads*100):'-'}</td>
+        <td class="r">${money(aggA.pur,2)}</td><td class="r">${money(aggA.fba,2)}</td>
+        <td class="r">${money(aggA.comm,2)}</td><td class="r">${money(aggA.cpn,2)}</td></tr>
       </tbody></table></div></div>`;
 }
 
@@ -890,10 +932,11 @@ function vRep(){
 function render(){
   const q = parseHash();
   const v = q.v || 'ov';
-  if(v === 'st' && q.st !== undefined) vStore(Number(q.st));
-  else if(v === 'cat' && q.st !== undefined && q.c !== undefined) vCat(Number(q.st), Number(q.c));
-  else if(v === 'pt' && q.st !== undefined && q.c !== undefined && q.pa !== undefined) vParent(Number(q.st), Number(q.c), Number(q.pa));
-  else if(v === 'sku' && q.a !== undefined) vSku(Number(q.st)||0, Number(q.c)||0, Number(q.pa)||0, Number(q.a));
+  if(v === 'st') vStore(Number(q.st) || 0);
+  else if(v === 'cat') vCatPage(Number(q.st) || 0);
+  else if(v === 'pt') vParentPage(Number(q.st) || 0, q.c);
+  else if(v === 'sku') vSkuPage(Number(q.st) || 0, q.pa);
+  else if(v === 'dt') vDetail(Number(q.st) || 0, q.a);
   else if(v === 'data') vData();
   else if(v === 'rep') vRep();
   else vOv();
