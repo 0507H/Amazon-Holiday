@@ -12,8 +12,21 @@
   --ink:#1C2B36; --sub:#5E7586; --faint:#8FA4B4; --green:#2E9E6B;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
-html.embedded body{background:#fff}
+body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;display:flex;min-height:100vh}
+html.embedded body{display:block;background:#fff}
+/* 自带侧边栏（嵌入门户时隐藏） */
+.side{width:192px;flex-shrink:0;background:var(--navy);padding:18px 0 14px;position:sticky;top:0;height:100vh;overflow-y:auto}
+html.embedded .side{display:none}
+.s-brand{display:flex;gap:10px;align-items:center;padding:0 16px 6px}
+.s-brand img{width:32px;height:32px;border-radius:8px}
+.s-brand .nm{color:#fff;font-weight:700;font-size:14px;line-height:1.3}
+.s-brand .sub{color:#8FB0C8;font-size:11px}
+.s-lbl{color:#6E8CA3;font-size:10.5px;padding:14px 16px 6px;letter-spacing:1px}
+.s-row{color:#D8E6F0;font-size:13px;padding:9px 16px;cursor:pointer;border-left:3px solid transparent}
+.s-row:hover{background:rgba(255,255,255,.06)}
+.s-row.on{background:rgba(27,163,184,.22);border-left-color:var(--teal);color:#fff;font-weight:600}
+.s-foot{margin-top:26px;color:#6E8CA3;font-size:11px;padding:0 16px;line-height:1.8}
+.main{flex:1;min-width:0}
 .wrap{max-width:1280px;margin:0 auto;padding:0 24px 48px}
 html.embedded .wrap{padding-top:18px}
 
@@ -139,6 +152,25 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
 </style>
 </head>
 <body>
+<aside class="side" id="sideNav">
+  <div class="s-brand">
+    <img src="logo-trans.png" alt="脆脆鲨">
+    <div><div class="nm">脆脆鲨</div><div class="sub">月度跟进</div></div>
+  </div>
+  <nav>
+    <div class="s-lbl">导航</div>
+    <div class="s-row" data-v="ov">目标总览</div>
+    <div class="s-lbl">店铺钻取</div>
+    <div class="s-row" data-v="st" data-st="0">AvanUS</div>
+    <div class="s-row" data-v="st" data-st="1">TakealookoUS</div>
+    <div class="s-row" data-v="st" data-st="2">TivorazakiUS</div>
+    <div class="s-lbl">工具</div>
+    <div class="s-row" data-v="rep">报告</div>
+    <div class="s-row" data-v="data">数据管理</div>
+  </nav>
+  <div class="s-foot">单文件自包含<br>可离线 · 可分享</div>
+</aside>
+<div class="main">
 <div class="wrap">
   <div class="top">
     <div class="crumb">运营工作台 <span class="sep">/</span> 月度跟进 <span class="sep">/</span> <b id="crumbV">总览</b></div>
@@ -147,6 +179,7 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
     </div>
   </div>
   <div id="app"></div>
+</div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -253,6 +286,22 @@ $app.addEventListener('click', e => {
   if(el.dataset.a !== undefined) q.a = el.dataset.a;
   navTo(q);
 });
+document.getElementById('sideNav').addEventListener('click', e => {
+  const el = e.target.closest('[data-v]');
+  if(!el) return;
+  const q = { v: el.dataset.v };
+  if(el.dataset.st !== undefined) q.st = el.dataset.st;
+  navTo(q);
+});
+function syncSide(v, q){
+  document.querySelectorAll('#sideNav .s-row').forEach(r => r.classList.remove('on'));
+  let sel = null;
+  if(v === 'ov') sel = '#sideNav .s-row[data-v="ov"]';
+  else if(v === 'rep') sel = '#sideNav .s-row[data-v="rep"]';
+  else if(v === 'data') sel = '#sideNav .s-row[data-v="data"]';
+  else if(['st','cat','pt','sku'].includes(v)) sel = '#sideNav .s-row[data-v="st"][data-st="' + (q.st || 0) + '"]';
+  if(sel){ const el = document.querySelector(sel); if(el) el.classList.add('on'); }
+}
 window.addEventListener('hashchange', render);
 
 function toast(msg){
@@ -606,6 +655,19 @@ function vData(){
         <span class="dnote" style="margin:0;align-self:center">重置会清除本地导入数据与目标修改</span>
       </div>
     </div>
+    <div class="sec"><div class="sec-h"><h2>分享与备份</h2></div>
+      <div class="panel">
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="field"><label>恢复数据快照（导入之前导出的 JSON）</label><input type="file" id="fJson" accept=".json"></div>
+          <div class="field"><label>&nbsp;</label><button class="btn" id="btnImportJson">导入 JSON 恢复</button></div>
+        </div>
+        <div class="dnote" style="margin-top:12px;line-height:2">
+          <b>分享给同事</b>：直接把链接发给同事即可，各自浏览器打开互不影响；同事在本页导入自己的积加按日 Excel、按需修改目标即完成个性化<br>
+          <b>备份 / 换电脑</b>：导出数据 JSON → 在任何浏览器点「导入 JSON 恢复」即可完整还原数据与进度<br>
+          <b>线上链接不可用时</b>：本页为单文件自包含（内嵌全部数据与逻辑），浏览器 Ctrl+S 保存到本地后双击打开照常使用，恢复 JSON 快照或重新导入 Excel 即可
+        </div>
+      </div>
+    </div>
     <div class="foot"><b>字段约定</b><br>
     · 支出类字段（广告花费/采购成本/FBA配送费/佣金/Coupon）在积加导出中为负数，看板统一按正数展示<br>
     · 空值"-"按 0 处理；店铺名自带分级后缀（B级/B-级）已自动剥离<br>
@@ -627,6 +689,16 @@ function vData(){
     aEl.href = URL.createObjectURL(blob);
     aEl.download = 'monthly-' + (DB.month||'data') + '.json';
     aEl.click();
+  };
+  document.getElementById('btnImportJson').onclick = async () => {
+    const f = document.getElementById('fJson').files[0];
+    if(!f){ toast('请先选择 JSON 文件'); return; }
+    try{
+      const o = JSON.parse(await f.text());
+      if(!o || !Array.isArray(o.rows) || !Array.isArray(o.days)) throw new Error('不是有效的月度跟进数据文件');
+      DB = o;
+      if(saveData()){ DATA_SRC = '本地导入'; toast('数据已恢复'); render(); }
+    }catch(err){ toast('导入失败：' + (err.message || err)); }
   };
   document.getElementById('btnReset').onclick = () => {
     localStorage.removeItem(LS_DATA); localStorage.removeItem(LS_TGT);
@@ -825,6 +897,7 @@ function render(){
   else if(v === 'data') vData();
   else if(v === 'rep') vRep();
   else vOv();
+  syncSide(v, q);
   window.parent && window.parent.postMessage({type:'monthly-view', v, q}, '*');
 }
 document.getElementById('monthPill').textContent = (DB.month || '').replace('-', '年') + '月' ;
