@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>脆脆鲨·工作台</title>
-<link rel="icon" href="logo.png">
+<link rel="icon" href="logo-trans.png">
 <style>
 :root{
   --navy:#0E3A57; --navy-2:#15496B; --teal:#1BA3B8; --coral:#B8423A; --amber:#E08A2E;
@@ -197,7 +197,7 @@ a{text-decoration:none;color:inherit}
 
   <div class="main">
     <header class="topbar">
-      <div class="crumb" id="crumb">工作台 <span class="sep">/</span> <span class="cur">首页驾驶舱</span></div>
+      <div class="crumb" id="crumb">脆脆鲨·运营工作台</div>
       <div class="right">
         <span class="date" id="topDate"></span>
         <button class="btn primary" id="btnNew">+ 新建任务</button>
@@ -459,7 +459,7 @@ function esc(s){
 }
 
 /* ============ 导航 ============ */
-function setCrumb(text){ $('crumb').innerHTML = '工作台 <span class="sep">/</span> <span class="cur">' + esc(text) + '</span>'; }
+function setCrumb(){ $('crumb').textContent = '脆脆鲨·运营工作台'; }
 function clearOn(){ nav.querySelectorAll('.row').forEach(r => r.classList.remove('on')); }
 
 function showHome(){
