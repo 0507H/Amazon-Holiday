@@ -15,7 +15,11 @@
 body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;display:flex;min-height:100vh}
 html.embedded body{display:block;background:#fff}
 /* 自带侧边栏（嵌入门户时隐藏） */
-.side{width:192px;flex-shrink:0;background:var(--navy);padding:18px 0 14px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.side{width:192px;flex-shrink:0;background:var(--navy);padding:18px 0 14px;position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-track{background:transparent}
+.side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+.side::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28)}
 html.embedded .side{display:none}
 .s-brand{display:flex;gap:10px;align-items:center;padding:0 16px 6px}
 .s-brand img{width:32px;height:32px;border-radius:8px}
@@ -667,11 +671,12 @@ function vData(){
       <div class="panel">
         <div class="form-grid">
           <div class="field"><label>① 按日明细（含「子列表-按日导出」sheet）</label><input type="file" id="fDaily" accept=".xlsx,.xls"></div>
-          <div class="field"><label>② 汇总导出（含「主列表-汇总导出」sheet，可选）</label><input type="file" id="fSum" accept=".xlsx,.xls"></div>
+          <div class="field"><label>② 汇总导出（含「主列表-汇总导出」sheet · 可选，不导也行）</label><input type="file" id="fSum" accept=".xlsx,.xls"></div>
           <div class="field"><label>&nbsp;</label><button class="btn primary" id="btnImport">解析并导入</button></div>
         </div>
         <div id="impMsg"></div>
-        <div class="dnote" style="margin-top:10px">导入会覆盖当前按日数据并写入浏览器本地存储（同域共享）；解析组件首次使用需联网加载</div>
+        <div class="dnote" style="margin-top:10px"><b>不是每次都要两个都导</b>：① 按日明细是主数据源，<b>单独导入即可</b>——销量 / 利润 / 广告 / 费用等全部统计都来自它；② 汇总文件只补充库存快照（FBA可售 / 周转天数），不导不影响任何统计，仅单品页的库存数字停留在上次快照。也支持只导 ② 更新库存、不动主数据。日常更新月度数据导 ① 就够，想同时刷新库存再带上 ②。</div>
+        <div class="dnote">导入会覆盖当前按日数据并写入浏览器本地存储（同域共享）；解析组件首次使用需联网加载</div>
       </div>
     </div>
     <div class="sec"><div class="sec-h"><h2>月度目标</h2><span class="hint">每店铺：销量 / 利润（销售净毛利）/ 净毛利率 · 保存后全站生效</span></div>

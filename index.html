@@ -26,7 +26,11 @@ a{text-decoration:none;color:inherit}
 .brand img{width:40px;height:40px;flex:none;object-fit:contain}
 .brand .nm{font-size:14px;font-weight:500;letter-spacing:.3px;color:#fff}
 .brand .sub{font-size:11px;color:#8FB0C8;margin-top:1px}
-.nav{padding:10px;flex:1;overflow:auto}
+.nav{padding:10px 6px 10px 10px;flex:1;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent}
+.nav::-webkit-scrollbar{width:5px}
+.nav::-webkit-scrollbar-track{background:transparent}
+.nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+.nav::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28)}
 .nav .lbl{font-size:11px;color:#8FB0C8;letter-spacing:.6px;padding:8px 8px 4px}
 .nav .row{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:6px;color:#D8E6F0;
   font-size:12.5px;cursor:pointer;border-left:3px solid transparent;transition:background .15s,color .15s;margin-bottom:2px}
@@ -143,17 +147,6 @@ a{text-decoration:none;color:inherit}
         <span class="tx">首页驾驶舱</span>
       </div>
 
-      <div class="row" id="grpTools">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="5" r="1.6"/><circle cx="12" cy="5" r="1.6"/><circle cx="19" cy="5" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="19" r="1.6"/><circle cx="12" cy="19" r="1.6"/><circle cx="19" cy="19" r="1.6"/></svg>
-        <span class="tx">工具中心</span>
-        <span class="caret" id="caretTools">▼</span>
-      </div>
-      <div class="items" id="toolsItems">
-        <div class="row sub-row" data-tool="pic-multi"><span class="tx">批量传图片</span></div>
-        <div class="row sub-row" data-tool="ad-generator"><span class="tx">批量传广告</span></div>
-        <div class="row sub-row" data-tool="date-fix"><span class="tx">批量改日期</span></div>
-      </div>
-
       <div class="row" id="grpTasks">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M8 9.5h8M8 14h5"/></svg>
         <span class="tx">任务管理</span>
@@ -164,6 +157,24 @@ a{text-decoration:none;color:inherit}
         <div class="row sub-row" data-tool="tasks" data-sub="month"><span class="tx">本月全量</span></div>
         <div class="row sub-row" data-tool="tasks" data-sub="report"><span class="tx">报告</span></div>
         <div class="row sub-row" data-tool="tasks" data-sub="data"><span class="tx">数据</span></div>
+      </div>
+
+      <div class="row" id="grpMonthly">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        <span class="tx">月度跟进</span>
+        <span class="caret" id="caretMonthly">▼</span>
+      </div>
+      <div class="items" id="monthlyItems">
+        <div class="lbl2">拆解链路</div>
+        <div class="row sub-row" data-tool="monthly" data-sub="ov"><span class="tx">① 总览</span></div>
+        <div class="row sub-row" data-tool="monthly" data-sub="st"><span class="tx">② 店铺</span></div>
+        <div class="row sub-row" data-tool="monthly" data-sub="cat"><span class="tx">③ 品类</span></div>
+        <div class="row sub-row" data-tool="monthly" data-sub="pt"><span class="tx">④ 父体</span></div>
+        <div class="row sub-row" data-tool="monthly" data-sub="sku"><span class="tx">⑤ 单品</span></div>
+        <div class="row sub-row" data-tool="monthly" data-sub="dt"><span class="tx">⑥ 数据层面</span></div>
+        <div class="lbl2">工具</div>
+        <div class="row sub-row" data-tool="monthly" data-sub="rep"><span class="tx">报告</span></div>
+        <div class="row sub-row" data-tool="monthly" data-sub="data"><span class="tx">数据管理</span></div>
       </div>
 
       <div class="row" id="grpHoliday">
@@ -191,23 +202,17 @@ a{text-decoration:none;color:inherit}
         <div class="row sub-row" data-tool="holiday" data-sub="data"><span class="tx">数据源</span></div>
       </div>
 
-      <div class="row" id="grpMonthly">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
-        <span class="tx">月度跟进</span>
-        <span class="caret" id="caretMonthly">▼</span>
+      <div class="row" id="grpTools">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="5" cy="5" r="1.6"/><circle cx="12" cy="5" r="1.6"/><circle cx="19" cy="5" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="19" r="1.6"/><circle cx="12" cy="19" r="1.6"/><circle cx="19" cy="19" r="1.6"/></svg>
+        <span class="tx">工具中心</span>
+        <span class="caret" id="caretTools">▼</span>
       </div>
-      <div class="items" id="monthlyItems">
-        <div class="lbl2">拆解链路</div>
-        <div class="row sub-row" data-tool="monthly" data-sub="ov"><span class="tx">① 总览</span></div>
-        <div class="row sub-row" data-tool="monthly" data-sub="st"><span class="tx">② 店铺</span></div>
-        <div class="row sub-row" data-tool="monthly" data-sub="cat"><span class="tx">③ 品类</span></div>
-        <div class="row sub-row" data-tool="monthly" data-sub="pt"><span class="tx">④ 父体</span></div>
-        <div class="row sub-row" data-tool="monthly" data-sub="sku"><span class="tx">⑤ 单品</span></div>
-        <div class="row sub-row" data-tool="monthly" data-sub="dt"><span class="tx">⑥ 数据层面</span></div>
-        <div class="lbl2">工具</div>
-        <div class="row sub-row" data-tool="monthly" data-sub="rep"><span class="tx">报告</span></div>
-        <div class="row sub-row" data-tool="monthly" data-sub="data"><span class="tx">数据管理</span></div>
+      <div class="items" id="toolsItems">
+        <div class="row sub-row" data-tool="pic-multi"><span class="tx">批量传图片</span></div>
+        <div class="row sub-row" data-tool="ad-generator"><span class="tx">批量传广告</span></div>
+        <div class="row sub-row" data-tool="date-fix"><span class="tx">批量改日期</span></div>
       </div>
+
     </nav>
 
     <div class="stat" id="sideStat">本月完成 <b>–</b><br>逾期 <b>–</b> 条待处理</div>
