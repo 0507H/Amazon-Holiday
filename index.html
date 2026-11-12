@@ -190,6 +190,17 @@ a{text-decoration:none;color:inherit}
         <div class="row sub-row" data-tool="holiday" data-sub="rule"><span class="tx">预警规则</span></div>
         <div class="row sub-row" data-tool="holiday" data-sub="data"><span class="tx">数据源</span></div>
       </div>
+
+      <div class="row" id="grpMonthly">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        <span class="tx">月度跟进</span>
+        <span class="caret" id="caretMonthly">▼</span>
+      </div>
+      <div class="items" id="monthlyItems">
+        <div class="row sub-row" data-tool="monthly" data-sub="ov"><span class="tx">目标总览</span></div>
+        <div class="row sub-row" data-tool="monthly" data-sub="rep"><span class="tx">报告</span></div>
+        <div class="row sub-row" data-tool="monthly" data-sub="data"><span class="tx">数据管理</span></div>
+      </div>
     </nav>
 
     <div class="stat" id="sideStat">本月完成 <b>–</b><br>逾期 <b>–</b> 条待处理</div>
@@ -262,7 +273,8 @@ const TOOLS = {
   'ad-generator': { file:'ad-generator.html',  title:'批量传广告', group:'工具中心' },
   'date-fix':     { file:'date-fix.html',      title:'批量改日期', group:'工具中心' },
   'tasks':        { file:'tasks.html',         title:'任务管理',   group:'任务管理' },
-  'holiday':      { file:'fba-dashboard.html', title:'季节品跟进', group:'节日跟进' }
+  'holiday':      { file:'fba-dashboard.html', title:'季节品跟进', group:'节日跟进' },
+  'monthly':      { file:'monthly.html',       title:'月度跟进',   group:'月度跟进' }
 };
 const TASK_KEY = 'lfh_tasks_v1';
 const DAY = 86400000;
@@ -524,6 +536,11 @@ nav.addEventListener('click', (e) => {
   if(row.id === 'grpHoliday'){
     $('holidayItems').classList.toggle('closed');
     $('caretHoliday').classList.toggle('closed');
+    return;
+  }
+  if(row.id === 'grpMonthly'){
+    $('monthlyItems').classList.toggle('closed');
+    $('caretMonthly').classList.toggle('closed');
     return;
   }
   if(row.dataset.tool) openTool(row.dataset.tool, row.dataset.sub);
