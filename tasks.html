@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>任务管理 · 脆脆鲨工作台</title>
+<style>
+:root{
+  --navy:#0E3A57; --teal:#1BA3B8; --coral:#B8423A; --amber:#E08A2E;
+  --bg:#F2F7FA; --card:#FFFFFF; --line:#E3E8ED; --line2:#EEF1F4;
+  --t1:#12212E; --t2:#64748B; --t3:#8797A6;
+  --tint-blue:#E7F3F7; --tint-red:#FBEDEA; --tint-amber:#FCF2E2; --tint-green:#E9F5F0;
+  --r:9px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--t1);font-size:13px;line-height:1.6;-webkit-font-smoothing:antialiased;padding:16px 20px 26px}
+.hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.hd h1{font-size:15px;font-weight:500}
+.hd .sub{font-size:12px;color:var(--t2);margin-top:3px}
+.hd .act{display:flex;gap:8px;align-items:center}
+.btn{font-size:12px;padding:5px 11px;border-radius:5px;border:1px solid #D7DEE5;background:#fff;color:#33475B;cursor:pointer}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.danger{color:var(--coral)}
+.btn:hover{opacity:.9}
+.tabs{display:flex;gap:4px;margin-bottom:14px;background:#E7EDF2;border-radius:8px;padding:3px;width:fit-content}
+.tab{font-size:12.5px;padding:5px 16px;border-radius:6px;cursor:pointer;color:var(--t2)}
+.tab.on{background:#fff;color:var(--navy);font-weight:500}
+.sumline{font-size:12.5px;color:var(--t2);margin-bottom:12px}
+.sumline b{color:var(--navy);font-weight:500}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;margin-bottom:10px}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.card-hd .t{font-size:13px;font-weight:500}
+.card-hd .n{font-size:11px;color:var(--t3)}
+.card.red{border-left:3px solid var(--coral)}
+.card.amber{border-left:3px solid var(--amber)}
+.card.teal{border-left:3px solid var(--teal)}
+.card.plain{border-left:none}
+.row{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid var(--line2);min-width:0}
+.row:first-child{border-top:none}
+.row.compact{padding:6px 0}
+.box{width:13px;height:13px;border:1.4px solid #C6CFD8;border-radius:3px;flex:none;cursor:pointer;position:relative}
+.box.done{background:var(--teal);border-color:var(--teal)}
+.box.done::after{content:"";position:absolute;left:3px;top:1px;width:4px;height:7px;border:1.5px solid #fff;
+  border-top:0;border-left:0;transform:rotate(42deg)}
+.nm{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1}
+.row.done .nm{color:#9AA9B6;text-decoration:line-through}
+.tag{font-size:11px;padding:1.5px 6px;border-radius:3px;flex:none;white-space:nowrap}
+.tag.red{background:var(--tint-red);color:var(--coral)}
+.tag.amber{background:var(--tint-amber);color:#A06A18}
+.tag.teal{background:var(--tint-blue);color:#1B93A6}
+.tag.green{background:var(--tint-green);color:#1F6B4F}
+.tag.gray{background:#EEF1F4;color:var(--t3)}
+.meta{margin-left:auto;font-size:11px;color:var(--t3);flex:none;white-space:nowrap}
+.acts{display:flex;gap:5px;flex:none}
+.mini{font-size:11px;color:var(--t3);border:1px solid var(--line2);background:#fff;border-radius:4px;padding:1.5px 7px;cursor:pointer}
+.mini:hover{color:var(--teal);border-color:#CFDDE6}
+.bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.bar input[type=text]{flex:1;min-width:180px;font-size:12.5px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--t1);outline:none}
+.bar select{font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--t1)}
+.empty{font-size:12px;color:var(--t3);padding:18px 0;text-align:center}
+.rate-num{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.rate-num b{font-size:21px;font-weight:500;color:var(--navy)}
+.rate-num span{font-size:11px;color:var(--t3)}
+.pbar{height:5px;border-radius:3px;background:#E3E8ED;overflow:hidden;margin-bottom:4px}
+.pbar i{display:block;height:100%;background:var(--teal)}
+.mod-row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--t2);padding:3px 0}
+.report pre{white-space:pre-wrap;font-family:inherit;font-size:12px;color:var(--t2);line-height:1.8;background:#F8FAFC;
+  border:1px solid var(--line2);border-radius:7px;padding:10px 12px;margin-top:8px;max-height:320px;overflow:auto}
+.mask{position:fixed;inset:0;background:rgba(14,42,60,.35);display:none;align-items:center;justify-content:center;z-index:50}
+.mask.on{display:flex}
+.modal{background:#fff;border-radius:10px;padding:18px 20px;width:440px;max-width:92vw;max-height:88vh;overflow:auto}
+.modal h3{font-size:14px;font-weight:500;margin-bottom:14px}
+.frm{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.frm .full{grid-column:1/-1}
+.frm label{font-size:11.5px;color:var(--t2);display:block;margin-bottom:3px}
+.frm input,.frm select,.frm textarea{width:100%;font-size:12.5px;padding:6px 9px;border:1px solid var(--line);border-radius:6px;
+  background:#fff;color:var(--t1);outline:none;font-family:inherit}
+.frm textarea{resize:vertical;min-height:54px}
+.modal .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="hd">
+  <div>
+    <h1>月度任务工作台</h1>
+    <div class="sub" id="subTitle"></div>
+  </div>
+  <div class="act">
+    <button class="btn" id="btnExport">导出</button>
+    <button class="btn primary" id="btnNew">+ 新建任务</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab on" data-tab="today">今日</div>
+  <div class="tab" data-tab="month">本月全量</div>
+  <div class="tab" data-tab="report">报告</div>
+  <div class="tab" data-tab="data">数据</div>
+</div>
+
+<div id="viewToday"></div>
+<div id="viewMonth" style="display:none"></div>
+<div id="viewReport" style="display:none"></div>
+<div id="viewData" style="display:none"></div>
+
+<div class="mask" id="mask">
+  <div class="modal">
+    <h3 id="mTitle">新建任务</h3>
+    <div class="frm">
+      <div class="full"><label>任务名称</label><input type="text" id="fTitle" placeholder="例如：SB广告*5"></div>
+      <div><label>店铺分组</label><select id="fGroup"><option>AVAN</option><option>Take</option><option>Tivo</option><option>未分组</option></select></div>
+      <div><label>模块</label><select id="fModule"><option>广告</option><option>滞销清理</option><option>品类</option><option>链接</option><option>新品</option><option>库存</option><option>父体</option><option>万圣清理</option><option>其他</option></select></div>
+      <div><label>开始日期</label><input type="date" id="fStart"></div>
+      <div><label>截止日期</label><input type="date" id="fDue"></div>
+      <div class="full"><label>循环规则</label><select id="fRule">
+        <option value="">不循环</option><option value="FREQ=WEEKLY;BYDAY=MO">每周一</option>
+        <option value="FREQ=WEEKLY;BYDAY=TU">每周二</option><option value="FREQ=WEEKLY;BYDAY=WE">每周三</option>
+        <option value="FREQ=WEEKLY;BYDAY=TH">每周四</option><option value="FREQ=WEEKLY;BYDAY=FR">每周五</option>
+        <option value="FREQ=WEEKLY;BYDAY=SA">每周六</option><option value="FREQ=WEEKLY;BYDAY=SU">每周日</option>
+        <option value="FREQ=DAILY">每天</option>
+      </select></div>
+      <div class="full"><label>备注 / 完成效果</label><textarea id="fNote" placeholder="完成后可记录效果，例如：ACOS 从 35% 降到 28%"></textarea></div>
+    </div>
+    <div class="foot">
+      <button class="btn" id="mCancel">取消</button>
+      <button class="btn danger" id="mDelete">删除</button>
+      <button class="btn primary" id="mSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY = 'lfh_tasks_v1';
+const DAY = 86400000;
+const SEED = {"version":1,"month":"2026-11","source":"feishu LFH-11月任务清单","fetched_at":"2026-11-12T04:43:55.289Z","tasks":[{"id":"lfh-1","title":"【测试】工作台写链路验证-可删除","group":"AVAN","module":"其他","parent":"","start":"2026-11-12","due":"2026-11-20","rrule":"","done":true,"done_at":"2026-11-11T04:37:47.000Z","guid":"d52b94a7-4c2c-452b-a615-ac078fc18879"},{"id":"lfh-2","title":"【测试】子任务写入验证","group":"AVAN","parent":"【测试】工作台写链路验证-可删除","start":"","due":"2026-11-15","rrule":"","done":false,"done_at":"","guid":"4b9405a9-13fc-4be6-8004-b8194c988e9b"},{"id":"lfh-3","title":"【测试】子任务写入验证","group":"AVAN","parent":"【测试】工作台写链路验证-可删除","start":"","due":"2026-11-15","rrule":"","done":false,"done_at":"","guid":"b03d87fd-914a-402f-b329-f85ea88d047b"},{"id":"lfh-4","title":"万圣库存清理","group":"Tivo","module":"万圣清理","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"2b7d0d96-5f03-42a3-bb9d-7d42bbbe82a6"},{"id":"lfh-5","title":"提交清算*200","group":"Tivo","parent":"万圣库存清理","start":"","due":"2026-11-03","rrule":"","done":true,"done_at":"2026-11-03T10:19:48.867Z","guid":"2f129a7c-4e1f-48c9-9ae3-b92ab746cc12"},{"id":"lfh-6","title":"提交清算*200","group":"Tivo","parent":"万圣库存清理","start":"","due":"2026-11-17","rrule":"","done":false,"done_at":"","guid":"4c393ec5-ce86-4ed9-9502-7a4015d293f6"},{"id":"lfh-7","title":"1920s 投放广告*3","group":"Tivo","parent":"万圣库存清理","start":"","due":"2026-11-03","rrule":"","done":true,"done_at":"2026-11-03T06:48:34.649Z","guid":"7c15c464-16d0-4f87-ab22-0ef2caf06e44"},{"id":"lfh-8","title":"B0H6MRTL11 到货跟进","group":"Tivo","module":"库存","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"b1d5cccc-2045-4b8a-b966-33c0f7c01a10"},{"id":"lfh-9","title":"降价、重启广告","group":"Tivo","parent":"B0H6MRTL11 到货跟进","start":"2026-11-22","due":"2026-11-29","rrule":"","done":false,"done_at":"","guid":"a6a5a31c-cded-4976-8067-9c5d961ee597"},{"id":"lfh-10","title":"销量、销售趋势排查返单","group":"Tivo","parent":"B0H6MRTL11 到货跟进","start":"2026-11-25","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"06dfd2fd-e341-40a7-8965-5f1d487f0c8f"},{"id":"lfh-11","title":"过季滞销清理","group":"Tivo","module":"滞销清理","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"21b93169-aaee-4c44-8654-a05856e04229"},{"id":"lfh-12","title":"清算弃置*300","group":"Tivo","parent":"过季滞销清理","start":"2026-11-03","due":"2026-11-03","rrule":"","done":true,"done_at":"2026-11-03T10:15:44.599Z","guid":"4e7c7ed1-2ba2-47ac-838a-60cb1a7a0810"},{"id":"lfh-13","title":"清算弃置*300","group":"Tivo","parent":"过季滞销清理","start":"2026-11-10","due":"2026-11-10","rrule":"","done":true,"done_at":"2026-11-10T09:58:50.393Z","guid":"42a82b24-bab3-4166-8084-26cae88a77c1"},{"id":"lfh-14","title":"清算弃置*400","group":"Tivo","parent":"过季滞销清理","start":"2026-11-17","due":"2026-11-17","rrule":"","done":false,"done_at":"","guid":"bd4c752e-7b3c-43dd-8abf-baa5f4d5e90b"},{"id":"lfh-15","title":"新品文案撰写*3","group":"Tivo","module":"新品","parent":"","start":"2026-11-01","due":"2026-11-11","rrule":"","done":false,"done_at":"","guid":"35ea4620-69d5-42f4-9047-c504a9fe521d"},{"id":"lfh-16","title":"新品文案撰写*3","group":"Take","module":"新品","parent":"","start":"2026-11-01","due":"2026-11-11","rrule":"","done":true,"done_at":"2026-11-11T09:26:43.864Z","guid":"0295025a-fb9b-48b9-8516-94a38dd0810a"},{"id":"lfh-17","title":"滞销库存清理","group":"Take","module":"滞销清理","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"606dc09f-4114-44d6-a5c0-1427341c1e8a"},{"id":"lfh-18","title":"过季产品清算弃置*500","group":"Take","parent":"滞销库存清理","start":"","due":"","rrule":"","done":true,"done_at":"2026-11-03T10:05:13.153Z","guid":"0e837836-1e3b-4d0d-b961-b74758ad155d"},{"id":"lfh-19","title":"过季产品清算弃置*500","group":"Take","parent":"滞销库存清理","start":"","due":"","rrule":"","done":true,"done_at":"2026-11-10T09:44:35.572Z","guid":"96766977-3993-4603-95c8-302f682fbef9"},{"id":"lfh-20","title":"不可售产品清算弃置*500","group":"Take","parent":"滞销库存清理","start":"","due":"","rrule":"","done":false,"done_at":"","guid":"ba40c024-9324-487b-8bf3-786cca7e43ad"},{"id":"lfh-21","title":"不可售产品清算弃置*500","group":"Take","parent":"滞销库存清理","start":"","due":"","rrule":"","done":false,"done_at":"","guid":"cbcde025-7c5f-4392-91e8-26cb1819c13e"},{"id":"lfh-22","title":"退出品类库存清理","group":"Take","module":"品类","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"dddd6607-b4d9-481e-918d-440b116f56fe"},{"id":"lfh-23","title":"无库存排查解除关联、删除链接","group":"Take","parent":"退出品类库存清理","start":"","due":"2026-11-04","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=WE","done":false,"done_at":"","guid":"1d4eb608-ed23-4d07-8179-bed556b6fee6"},{"id":"lfh-24","title":"品类排查降价","group":"Take","parent":"退出品类库存清理","start":"","due":"2026-11-03","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=MO","done":false,"done_at":"","guid":"8f92eee2-ef61-4ef6-a47b-6f3f570047dd"},{"id":"lfh-25","title":"创建黑五折扣，无法参加的创建20%coupons","group":"Take","parent":"退出品类库存清理","start":"2026-11-01","due":"2026-11-13","rrule":"","done":false,"done_at":"","guid":"14238463-94b3-48cc-b3b6-4e5389e7d7ef"},{"id":"lfh-26","title":"广告","group":"AVAN","module":"广告","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"99d8961f-d594-434b-9eeb-46a5b82337a4"},{"id":"lfh-27","title":"SB广告*5","group":"AVAN","parent":"广告","start":"","due":"2026-11-06","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=FR","done":false,"done_at":"","guid":"a0dc8ea1-a916-4c30-849a-0932879f3711"},{"id":"lfh-28","title":"SP受众广告*10","group":"AVAN","parent":"广告","start":"","due":"2026-11-03","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=TU","done":false,"done_at":"","guid":"3df15970-eaa4-490c-84bd-93d6fdb1ecbc"},{"id":"lfh-29","title":"钓鱼广告复制*15","group":"AVAN","parent":"广告","start":"","due":"2026-11-03","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=MO","done":false,"done_at":"","guid":"6402fcee-6cda-411c-a32c-70f2521d03a0"},{"id":"lfh-30","title":"受众广告*10","group":"AVAN","parent":"广告","start":"","due":"2026-11-10","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=TU","done":false,"done_at":"","guid":"009455a9-f35a-4d8c-99ce-ab9efa1c3160"},{"id":"lfh-31","title":"滞销","group":"AVAN","module":"滞销清理","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"78596889-c205-43d1-982a-7866852eb452"},{"id":"lfh-32","title":"可售滞销排查、调整","group":"AVAN","parent":"滞销","start":"","due":"2026-11-03","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=TU","done":false,"done_at":"","guid":"52fab73e-e6c0-4d25-acef-5be43e943d63"},{"id":"lfh-33","title":"不可售滞销排查、调整","group":"AVAN","parent":"滞销","start":"","due":"2026-11-03","rrule":"","done":true,"done_at":"2026-11-03T09:50:11.682Z","guid":"4ce3260c-3af6-4054-96e2-7ec8f2150806"},{"id":"lfh-34","title":"不可售滞销排查、调整","group":"AVAN","parent":"滞销","start":"","due":"2026-11-10","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=TU","done":false,"done_at":"","guid":"83d59bde-5276-4816-a427-19bcf15f75d4"},{"id":"lfh-35","title":"品类","group":"AVAN","module":"品类","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"f04bd152-5e8b-4d7b-82ee-73f0099122ff"},{"id":"lfh-36","title":"广告花费排查、拓展","group":"AVAN","parent":"品类","start":"2026-11-01","due":"2026-11-30","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=MO","done":false,"done_at":"","guid":"cd96e8fb-5346-4951-ba5c-45a01c82ab77"},{"id":"lfh-37","title":"数据指标排查、调整","group":"AVAN","parent":"品类","start":"2026-11-01","due":"2026-11-30","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=MO","done":false,"done_at":"","guid":"9a003896-657f-45e7-a71f-bd927592f6b6"},{"id":"lfh-38","title":"链接类目节点排查、更改","group":"AVAN","parent":"品类","start":"2026-11-01","due":"2026-11-30","rrule":"FREQ=WEEKLY;INTERVAL=2;WKST=MO;BYDAY=WE","done":false,"done_at":"","guid":"3e20ae3b-0efe-4f9b-bdaf-a7578e3e0832"},{"id":"lfh-39","title":"市场热度词更进","group":"AVAN","parent":"品类","start":"2026-11-01","due":"2026-11-30","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=MO","done":false,"done_at":"","guid":"7c5ba741-3d64-41bd-9c9a-69838e94a0c5"},{"id":"lfh-40","title":"链接","group":"AVAN","module":"链接","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"9667158c-0e28-48f7-911d-61a20779d4ee"},{"id":"lfh-41","title":"退市链接排查删除、解除关联","group":"AVAN","parent":"链接","start":"","due":"2026-11-03","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=MO","done":false,"done_at":"","guid":"29943367-adcd-4bd7-becb-62de64c6ad8e"},{"id":"lfh-42","title":"退出品类链接排查删除、解除关联","group":"AVAN","parent":"链接","start":"","due":"2026-11-03","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=MO","done":false,"done_at":"","guid":"afe70f8b-22da-44f8-b102-f142dc9dfc06"},{"id":"lfh-43","title":"新品","group":"AVAN","module":"新品","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"5be7cbf4-3051-47c7-8ac7-e0b96253b023"},{"id":"lfh-44","title":"开售*23","group":"AVAN","parent":"新品","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"db9c564c-c62d-4e71-8e84-0d3a16c13485"},{"id":"lfh-45","title":"文案*5","group":"AVAN","parent":"新品","start":"2026-11-02","due":"2026-11-11","rrule":"","done":false,"done_at":"","guid":"23adf42b-cbef-4208-9c17-9917bf6dd84b"},{"id":"lfh-46","title":"库存","group":"AVAN","module":"库存","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"b2ecafbb-9c74-45c4-bb62-b475844ae51b"},{"id":"lfh-47","title":"S、A级可售周转排查、返单","group":"AVAN","parent":"库存","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"bf620266-df3d-403f-b15a-c13e076e5cf4"},{"id":"lfh-48","title":"B、C级可售周转排查、返单","group":"AVAN","parent":"库存","start":"2026-11-01","due":"2026-11-30","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=WE","done":false,"done_at":"","guid":"c5fba0ea-006f-4361-9e1b-3e614860ff7b"},{"id":"lfh-49","title":"DXE级剩余库存排查、调整","group":"AVAN","parent":"库存","start":"2026-11-01","due":"2026-11-30","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=TU","done":false,"done_at":"","guid":"8a2cefb7-07c3-4952-8e5f-f820eea5fbdf"},{"id":"lfh-50","title":"库存盘点","group":"AVAN","parent":"库存","start":"2026-11-01","due":"2026-11-30","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=TH","done":false,"done_at":"","guid":"a7534dec-7b1e-4008-bccc-5b0de6b2795d"},{"id":"lfh-51","title":"S、A级可售周转排查、返单","group":"AVAN","parent":"库存","start":"2026-11-08","due":"2026-12-07","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=MO","done":false,"done_at":"","guid":"115d978a-6f3b-4a2b-947b-11d89805b859"},{"id":"lfh-52","title":"父体","group":"AVAN","module":"父体","parent":"","start":"2026-11-01","due":"2026-11-30","rrule":"","done":false,"done_at":"","guid":"3ddb6226-ffe5-4d0d-a1df-c3802a3a8753"},{"id":"lfh-53","title":"趋势分析、调整策略","group":"AVAN","parent":"父体","start":"2026-11-01","due":"2026-11-30","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=TH","done":false,"done_at":"","guid":"f4809c61-c091-4e5b-a247-3739e54ece03"},{"id":"lfh-54","title":"调整落地","group":"AVAN","parent":"父体","start":"2026-11-01","due":"2026-11-30","rrule":"FREQ=WEEKLY;INTERVAL=1;WKST=MO;BYDAY=FR","done":false,"done_at":"","guid":"c335c9d3-3033-4969-a7c0-2490030f852f"}]};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const iso = (ts) => { const d = new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const dayStart = (v) => { const d = new Date(v); d.setHours(0,0,0,0); return d.getTime(); };
+const today0 = () => dayStart(new Date());
+const todayIso = () => iso(new Date());
+
+/* ---------- 循环规则 ---------- */
+function parseRRule(rule){
+  const m = {};
+  String(rule||'').split(';').forEach(p => { const kv = p.split('='); if(kv[0]) m[kv[0].toUpperCase()] = kv[1]; });
+  const map = {SU:0,MO:1,TU:2,WE:3,TH:4,FR:5,SA:6};
+  return { freq:(m.FREQ||'').toUpperCase(), interval:Math.max(1,parseInt(m.INTERVAL||'1',10)||1),
+    byday:(m.BYDAY||'').split(',').filter(Boolean).map(d=>map[d.trim().toUpperCase()]).filter(v=>v!==undefined) };
+}
+function occurrences(rule, fromTs, toTs){
+  const r = parseRRule(rule), out = [];
+  if(!rule || toTs < fromTs) return out;
+  if(r.freq === 'WEEKLY' && r.byday.length){
+    for(let ts = dayStart(fromTs); ts <= toTs; ts += DAY){ if(r.byday.includes(new Date(ts).getDay())) out.push(ts); }
+  } else if(r.freq === 'DAILY'){
+    for(let ts = dayStart(fromTs); ts <= toTs; ts += DAY * r.interval) out.push(ts);
+  }
+  return out;
+}
+function routineLabel(rule){
+  const r = parseRRule(rule);
+  const dayMap = {0:'每周日',1:'每周一',2:'每周二',3:'每周三',4:'每周四',5:'每周五',6:'每周六'};
+  if(r.freq === 'DAILY') return '每天';
+  if(r.freq === 'WEEKLY' && r.byday.length === 1) return dayMap[r.byday[0]] || '每周';
+  if(r.freq === 'WEEKLY' && r.byday.length > 1) return '每周' + r.byday.length + '天';
+  return '循环';
+}
+
+/* ---------- 数据 ---------- */
+let TASKS = [];
+function save(){ localStorage.setItem(KEY, JSON.stringify({version:1, tasks:TASKS, saved_at:new Date().toISOString()})); }
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){ const o = JSON.parse(raw); if(o && Array.isArray(o.tasks) && o.tasks.length) return o.tasks; }
+  }catch(e){}
+  return null;
+}
+function initTasks(){
+  const stored = load();
+  TASKS = stored || JSON.parse(JSON.stringify(SEED && SEED.tasks ? SEED.tasks : []));
+  if(!stored && TASKS.length) save();
+}
+
+/* ---------- 状态判定 ---------- */
+function isDoneOn(t, ts0){
+  if(t.rrule) return (t.done_dates || []).includes(iso(ts0));
+  return !!t.done;
+}
+function statusOf(t, ts0){
+  const due = t.due ? dayStart(t.due) : null;
+  if(!t.rrule && t.done) return { key:'done', label:'已完成', cls:'green', due };
+  if(due === null) return { key:'none', label:'无日期', cls:'gray', due:null };
+  if(t.rrule){
+    const missed = occurrences(t.rrule, due + DAY, ts0 - DAY).filter(ts => !(t.done_dates||[]).includes(iso(ts))).length;
+    if(missed > 0) return { key:'over', label:'漏卡 ' + missed + ' 次', cls:'red', due, missed };
+    if(occurrences(t.rrule, ts0, ts0).length && (t.done_dates||[]).includes(iso(ts0)))
+      return { key:'routineDone', label:'今日已完成', cls:'green', due };
+    if(occurrences(t.rrule, ts0, ts0).length) return { key:'routine', label: routineLabel(t.rrule), cls:'teal', due };
+    const next = occurrences(t.rrule, ts0 + DAY, ts0 + 31*DAY)[0];
+    if(due > ts0) return { key:'later', label:(due - ts0) / DAY < 1 ? '今天' : Math.round((due-ts0)/DAY) + ' 天后', cls:due === ts0 + DAY ? 'amber' : 'gray', due };
+    if(next) return { key:'later', label:'下次 ' + iso(next).slice(5), cls:'gray', due:next };
+    return { key:'later', label:'已过周期', cls:'gray', due };
+  }
+  if(due < ts0) return { key:'over', label:'逾期 ' + Math.round((ts0-due)/DAY) + ' 天', cls:'red', due };
+  if(due === ts0) return { key:'today', label:'今天截止', cls:'amber', due };
+  const dd = Math.round((due - ts0) / DAY);
+  return { key:'later', label: dd === 1 ? '明天' : dd + ' 天后', cls: dd <= 7 ? 'amber' : 'gray', due };
+}
+
+/* ---------- 今日视图 ---------- */
+function renderToday(){
+  const t0 = today0();
+  const t0Iso = todayIso();
+  let over = 0, dueToday = 0, routine = 0, miss = 0;
+  const buckets = { over:[], today:[], routine:[], week:[] };
+  TASKS.forEach(t => {
+    const st = statusOf(t, t0);
+    if(st.key === 'done' || st.key === 'routineDone') return;
+    const due = st.due != null ? st.due : null;
+    if(st.key === 'over'){
+      buckets.over.push({t, st});
+      if(t.rrule) miss += st.missed; else over++;
+    }
+    else if(st.key === 'today'){ buckets.today.push({t, st}); dueToday++; }
+    else if(st.key === 'routine'){ buckets.routine.push({t, st}); routine++; }
+    else if(st.due != null && st.due > t0 && st.due <= t0 + 7*DAY) buckets.week.push({t, st});
+  });
+  const sortFn = (a,b) => (a.st.due||0) - (b.st.due||0);
+  buckets.over.sort(sortFn); buckets.today.sort(sortFn); buckets.routine.sort(sortFn); buckets.week.sort(sortFn);
+
+  const weekCN = '日一二三四五六'[new Date(t0).getDay()];
+  let html = '<div class="sumline">' + iso(t0).slice(5) + ' 周' + weekCN
+    + ' · 逾期 <b>' + over + '</b> · 循环漏卡 <b>' + miss + '</b> · 今日到期 <b>' + dueToday + '</b> · 今日例行 <b>' + routine + '</b></div>';
+
+  const mk = (title, arr, cls, extra) => {
+    if(!arr.length) return '<div class="card plain ' + cls + '"><div class="card-hd"><div class="t">' + title + '</div><div class="n">0 条</div></div><div class="empty">没有需要处理的任务</div></div>';
+    return '<div class="card ' + cls + '"><div class="card-hd"><div class="t">' + title + '</div><div class="n">' + arr.length + ' 条</div></div>'
+      + arr.map(r => rowHtml(r.t, r.st, extra)).join('') + '</div>';
+  };
+  html += mk('风险与逾期（含循环漏卡）', buckets.over, 'red', 'over');
+  html += mk('今日到期', buckets.today, 'amber', 'today');
+  html += mk('今日例行', buckets.routine, 'teal', 'routine');
+  html += mk('未来 7 天到期', buckets.week, 'plain', 'week');
+  $('viewToday').innerHTML = html;
+}
+
+function rowHtml(t, st, mode){
+  const meta = [t.group, t.module, t.parent ? '父·' + t.parent : ''].filter(Boolean).map(esc).join(' · ');
+  const tags = [];
+  if(mode === 'over' && st.missed) tags.push('<span class="tag red">漏卡 ' + st.missed + '</span>');
+  if(mode === 'over' && !t.rrule) tags.push('<span class="tag red">逾期 ' + Math.round((today0()-st.due)/DAY) + ' 天</span>');
+  if(mode === 'today') tags.push('<span class="tag amber">今天截止</span>');
+  if(mode === 'routine') tags.push('<span class="tag teal">' + routineLabel(t.rrule) + '</span>');
+  if(mode === 'week'){ const dd = Math.round((st.due - today0()) / DAY); tags.push('<span class="tag ' + (dd <= 3 ? 'amber' : 'gray') + '">' + (dd === 1 ? '明天' : dd + ' 天后') + '</span>'); }
+  if(t.rrule && mode !== 'routine') tags.push('<span class="tag teal">' + routineLabel(t.rrule) + '</span>');
+  const doneToday = isDoneOn(t, today0());
+  const postpone = (mode === 'over' && !t.rrule) ? '<button class="mini" data-postpone="' + t.id + '">改到今天</button>' : '';
+  return '<div class="row" data-row="' + t.id + '">'
+    + '<div class="box ' + (doneToday ? 'done' : '') + '" data-check="' + t.id + '"></div>'
+    + '<div class="nm" title="' + esc(t.title) + '">' + esc(t.title) + '</div>'
+    + tags.join('')
+    + '<span class="meta">' + meta + '</span>'
+    + '<span class="acts">' + postpone + '<button class="mini" data-edit="' + t.id + '">编辑</button></span>'
+    + '</div>';
+}
+
+/* ---------- 本月全量 ---------- */
+let filter = { q:'', group:'', module:'', status:'' };
+function renderMonth(){
+  const t0 = today0();
+  const groups = [...new Set(TASKS.map(t => t.group).filter(Boolean))];
+  const modules = [...new Set(TASKS.map(t => t.module).filter(Boolean))];
+  let list = TASKS.filter(t => {
+    if(filter.q && !t.title.toLowerCase().includes(filter.q.toLowerCase())) return false;
+    if(filter.group && t.group !== filter.group) return false;
+    if(filter.module && t.module !== filter.module) return false;
+    const st = statusOf(t, t0);
+    if(filter.status === 'pending' && (st.key === 'done' || st.key === 'routineDone')) return false;
+    if(filter.status === 'over' && st.key !== 'over') return false;
+    if(filter.status === 'today' && !(st.key === 'today' || st.key === 'routine')) return false;
+    if(filter.status === 'done' && !(st.key === 'done' || st.key === 'routineDone')) return false;
+    return true;
+  });
+  list.sort((a,b) => {
+    const sa = statusOf(a, t0), sb = statusOf(b, t0);
+    const rank = (s) => s.key === 'over' ? 0 : s.key === 'today' ? 1 : s.key === 'routine' ? 2 : (s.due != null ? 3 : 4);
+    return rank(sa) - rank(sb) || (sa.due||0) - (sb.due||0);
+  });
+
+  let html = '<div class="bar">'
+    + '<input type="text" id="fQ" placeholder="搜索任务名称…" value="' + esc(filter.q) + '">'
+    + '<select id="fGroup2"><option value="">全部分组</option>' + groups.map(g => '<option' + (filter.group === g ? ' selected' : '') + '>' + esc(g) + '</option>').join('') + '</select>'
+    + '<select id="fModule2"><option value="">全部模块</option>' + modules.map(g => '<option' + (filter.module === g ? ' selected' : '') + '>' + esc(g) + '</option>').join('') + '</select>'
+    + '<select id="fStatus2"><option value="">全部状态</option>'
+    + '<option value="pending"' + (filter.status === 'pending' ? ' selected' : '') + '>未完成</option>'
+    + '<option value="over"' + (filter.status === 'over' ? ' selected' : '') + '>逾期/漏卡</option>'
+    + '<option value="today"' + (filter.status === 'today' ? ' selected' : '') + '>今天</option>'
+    + '<option value="done"' + (filter.status === 'done' ? ' selected' : '') + '>已完成</option></select>'
+    + '<span style="font-size:11.5px;color:var(--t3);align-self:center">' + list.length + ' 条</span></div>';
+  html += list.length
+    ? '<div class="card plain">' + list.map(t => rowHtml(t, statusOf(t, t0), 'month')).join('') + '</div>'
+    : '<div class="empty">没有匹配的任务</div>';
+  $('viewMonth').innerHTML = html;
+
+  $('fQ').addEventListener('input', (e) => { filter.q = e.target.value; refreshMonth(); });
+  $('fGroup2').addEventListener('change', (e) => { filter.group = e.target.value; refreshMonth(); });
+  $('fModule2').addEventListener('change', (e) => { filter.module = e.target.value; refreshMonth(); });
+  $('fStatus2').addEventListener('change', (e) => { filter.status = e.target.value; refreshMonth(); });
+}
+let monthTimer = null;
+function refreshMonth(){ clearTimeout(monthTimer); monthTimer = setTimeout(renderMonth, 150); }
+
+/* ---------- 报告 ---------- */
+function monthDoneCount(){
+  const now = new Date();
+  let n = 0;
+  TASKS.forEach(t => {
+    if(t.rrule){ (t.done_dates||[]).forEach(d => { const dt = new Date(d); if(dt.getMonth() === now.getMonth()) n++; }); }
+    else if(t.done && t.done_at && new Date(dayStart(t.done_at)).getMonth() === now.getMonth()) n++;
+  });
+  return n;
+}
+function reportText(kind){
+  const t0 = today0(), t0Iso = todayIso();
+  const fmtD = (ts) => iso(ts).slice(5);
+  if(kind === 'day'){
+    const doneToday = TASKS.filter(t => t.rrule ? (t.done_dates||[]).includes(t0Iso)
+      : (t.done && t.done_at && iso(dayStart(t.done_at)) === t0Iso));
+    const rows = todayList();
+    const over = rows.filter(r => r.st.key === 'over').length;
+    return '【日报】' + t0Iso + '\n'
+      + '今日完成 ' + doneToday.length + ' 条：' + (doneToday.map(t => t.title).join('、') || '暂无') + '\n'
+      + '今日待处理 ' + rows.length + ' 条（逾期/漏卡 ' + over + ' 条）\n'
+      + rows.slice(0, 10).map(r => '  - ' + r.t.title + (r.st.missed ? '（漏卡' + r.st.missed + '）' : '')).join('\n')
+      + '\n剩余未完成 ' + TASKS.filter(t => { const s = statusOf(t, t0); return s.key !== 'done' && s.key !== 'routineDone'; }).length + ' 条';
+  }
+  if(kind === 'week'){
+    const w0 = t0 - 6*DAY;
+    const doneWeek = TASKS.filter(t => {
+      if(t.rrule) return (t.done_dates||[]).some(d => { const ts = dayStart(d); return ts >= w0 && ts <= t0; });
+      return t.done && t.done_at && dayStart(t.done_at) >= w0 && dayStart(t.done_at) <= t0;
+    });
+    const byGroup = {};
+    TASKS.forEach(t => { if(t.group) byGroup[t.group] = byGroup[t.group] || {d:0, m:0}; });
+    TASKS.forEach(t => {
+      const g = byGroup[t.group]; if(!g) return;
+      const isD = t.rrule ? (t.done_dates||[]).some(d => { const ts = dayStart(d); return ts >= w0 && ts <= t0; })
+        : (t.done && t.done_at && dayStart(t.done_at) >= w0 && dayStart(t.done_at) <= t0);
+      if(isD) g.d++;
+    });
+    const overdue = TASKS.filter(t => statusOf(t, t0).key === 'over').length;
+    const miss = TASKS.reduce((s,t) => s + (statusOf(t, t0).missed || 0), 0);
+    return '【周报】近 7 天（' + fmtD(w0) + ' ~ ' + fmtD(t0) + '）\n'
+      + '完成 ' + doneWeek.length + ' 条：' + doneWeek.slice(0, 12).map(t => t.title).join('、') + '\n'
+      + Object.keys(byGroup).map(g => '  - ' + g + '：完成 ' + byGroup[g].d + ' 条').join('\n') + '\n'
+      + '当前逾期/漏卡 ' + overdue + ' 条，循环漏卡合计 ' + miss + ' 次\n'
+      + (miss > 0 ? '行动项：优先补做循环漏卡' : '行动项：本周循环任务执行到位，保持');
+  }
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime() - DAY;
+  const inMonth = TASKS.filter(t => t.due && dayStart(t.due) >= monthStart && dayStart(t.due) <= monthEnd);
+  const byMod = {};
+  inMonth.forEach(t => { byMod[t.module || '其他'] = byMod[t.module || '其他'] || {d:0, m:0};
+    const isD = t.rrule ? (t.done_dates||[]).some(d => dayStart(d) <= t0)
+      : (t.done && t.done_at && dayStart(t.done_at) <= t0);
+    if(isD) byMod[t.module || '其他'].d++; else byMod[t.module || '其他'].m++; });
+  const doneN = monthDoneCount();
+  const rate = inMonth.length ? Math.round(doneN / inMonth.length * 100) : 0;
+  return '【月报】' + now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '\n'
+    + '本月任务 ' + inMonth.length + ' 条，已完成 ' + doneN + ' 条（' + rate + '%）\n'
+    + Object.keys(byMod).map(m => '  - ' + m + '：完成 ' + byMod[m].d + ' / 未完 ' + byMod[m].m).join('\n') + '\n'
+    + '月度四问：哪些要加码（完成率高模块）· 哪些要重做（逾期集中模块）· 哪些清库存（滞销/万圣）· 下月预算怎么分';
+}
+function todayList(){
+  const t0 = today0(), rows = [];
+  TASKS.forEach(t => {
+    const st = statusOf(t, t0);
+    if(st.key === 'over' || st.key === 'today' || st.key === 'routine') rows.push({t, st});
+  });
+  return rows;
+}
+function renderReport(){
+  $('viewReport').innerHTML = ['day','week','month'].map(k => {
+    const name = k === 'day' ? '日报' : k === 'week' ? '周报' : '月报';
+    return '<div class="card plain report"><div class="card-hd"><div class="t">' + name + '</div>'
+      + '<span class="acts"><button class="mini" data-gen="' + k + '">生成</button>'
+      + '<button class="mini" data-copy="' + k + '">复制文本</button></span></div>'
+      + '<pre id="rep-' + k + '">点击「生成」查看</pre></div>';
+  }).join('') + '<div class="hint" style="font-size:11px;color:var(--t3);text-align:right;margin-top:6px">基于本地完成记录自动汇总</div>';
+}
+
+/* ---------- 数据 ---------- */
+function renderData(){
+  $('viewData').innerHTML = '<div class="card plain"><div class="card-hd"><div class="t">数据管理</div></div>'
+    + '<div style="font-size:12px;color:var(--t2);line-height:2">'
+    + '当前本地数据 <b>' + TASKS.length + '</b> 条'
+    + (SEED ? '（飞书种子 ' + SEED.fetched_at.slice(0,10) + '）' : '')
+    + '<br>数据保存在浏览器 localStorage，与首页驾驶舱共用；换设备请用导出/导入迁移。'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'
+    + '<button class="btn" id="dExport">导出 JSON</button>'
+    + '<button class="btn" id="dImport">导入 JSON</button>'
+    + '<input type="file" id="dFile" accept=".json" style="display:none">'
+    + '<button class="btn" id="dSeed">重置为飞书种子</button>'
+    + '</div></div>';
+  $('dExport').addEventListener('click', exportJson);
+  $('dImport').addEventListener('click', () => $('dFile').click());
+  $('dFile').addEventListener('change', importJson);
+  $('dSeed').addEventListener('click', () => {
+    if(!SEED) return alert('页面里没有种子数据');
+    if(!confirm('将本地 ' + TASKS.length + ' 条任务重置为种子数据（' + SEED.tasks.length + ' 条），当前完成记录会丢失。继续？')) return;
+    TASKS = JSON.parse(JSON.stringify(SEED.tasks)); save(); renderAll();
+  });
+}
+
+function exportJson(){
+  const blob = new Blob([JSON.stringify({version:1, tasks:TASKS, exported_at:new Date().toISOString()}, null, 1)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'lfh-tasks-' + todayIso() + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importJson(e){
+  const f = e.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try{
+      const o = JSON.parse(rd.result);
+      const arr = Array.isArray(o) ? o : o.tasks;
+      if(!Array.isArray(arr) || !arr.length) throw new Error('格式不对');
+      TASKS = arr; save(); renderAll();
+      alert('已导入 ' + TASKS.length + ' 条任务');
+    }catch(err){ alert('导入失败：' + err.message); }
+  };
+  rd.readAsText(f, 'utf8');
+}
+
+/* ---------- 编辑 ---------- */
+let editing = null;
+function openModal(id){
+  const t = id ? TASKS.find(x => x.id === id) : null;
+  editing = t || null;
+  $('mTitle').textContent = t ? '编辑任务' : '新建任务';
+  $('fTitle').value = t ? t.title : '';
+  $('fGroup').value = t && t.group ? t.group : '未分组';
+  $('fModule').value = t && t.module ? t.module : '其他';
+  $('fStart').value = t && t.start ? t.start : '';
+  $('fDue').value = t && t.due ? t.due : '';
+  $('fRule').value = t && t.rrule ? t.rrule : '';
+  $('fNote').value = t && t.note ? t.note : '';
+  $('mDelete').style.display = t ? '' : 'none';
+  $('mask').classList.add('on');
+  $('fTitle').focus();
+}
+$('mCancel').addEventListener('click', () => $('mask').classList.remove('on'));
+$('mask').addEventListener('click', (e) => { if(e.target === $('mask')) $('mask').classList.remove('on'); });
+$('mDelete').addEventListener('click', () => {
+  if(!editing || !confirm('删除「' + editing.title + '」？')) return;
+  TASKS = TASKS.filter(x => x.id !== editing.id);
+  save(); $('mask').classList.remove('on'); renderAll();
+});
+$('mSave').addEventListener('click', () => {
+  const title = $('fTitle').value.trim();
+  if(!title) return alert('请填写任务名称');
+  const data = {
+    title, group: $('fGroup').value, module: $('fModule').value,
+    start: $('fStart').value, due: $('fDue').value,
+    rrule: $('fRule').value, note: $('fNote').value.trim()
+  };
+  if(editing) Object.assign(editing, data);
+  else TASKS.push(Object.assign({ id:'t' + Date.now(), done:false, done_at:'', done_dates:[], parent:'' }, data));
+  save(); $('mask').classList.remove('on'); renderAll();
+});
+
+/* ---------- 交互 ---------- */
+document.querySelectorAll('.tab').forEach(tb => tb.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  tb.classList.add('on');
+  ['today','month','report','data'].forEach(k => $('view' + k[0].toUpperCase() + k.slice(1)).style.display = k === tb.dataset.tab ? '' : 'none');
+  if(tb.dataset.tab === 'report') renderReport();
+  if(tb.dataset.tab === 'data') renderData();
+}));
+
+document.body.addEventListener('click', (e) => {
+  const chk = e.target.closest('[data-check]');
+  if(chk){
+    const t = TASKS.find(x => x.id === chk.dataset.check);
+    if(!t) return;
+    const t0Iso = todayIso();
+    if(t.rrule){
+      t.done_dates = t.done_dates || [];
+      const i = t.done_dates.indexOf(t0Iso);
+      if(i >= 0) t.done_dates.splice(i, 1); else t.done_dates.push(t0Iso);
+    } else {
+      t.done = !t.done;
+      t.done_at = t.done ? new Date().toISOString() : '';
+    }
+    save(); renderActive(); return;
+  }
+  const ed = e.target.closest('[data-edit]');
+  if(ed) return openModal(ed.dataset.edit);
+  const pg = e.target.closest('[data-postpone]');
+  if(pg){
+    const t = TASKS.find(x => x.id === pg.dataset.postpone);
+    if(t){ t.due = todayIso(); save(); renderActive(); }
+    return;
+  }
+  const gen = e.target.closest('[data-gen]');
+  if(gen) return void ($('rep-' + gen.dataset.gen).textContent = reportText(gen.dataset.gen));
+  const cp = e.target.closest('[data-copy]');
+  if(cp){
+    const txt = reportText(cp.dataset.copy);
+    navigator.clipboard.writeText(txt).then(() => alert('已复制，可粘贴到飞书/微信')).catch(() => alert('复制失败，请手动选择文本'));
+    return;
+  }
+});
+
+$('btnNew').addEventListener('click', () => openModal(null));
+$('btnExport').addEventListener('click', exportJson);
+
+function renderActive(){
+  const on = document.querySelector('.tab.on').dataset.tab;
+  if(on === 'today') renderToday();
+  if(on === 'month') renderMonth();
+  if(on === 'data') renderData();
+}
+function renderAll(){ renderActive(); if(document.querySelector('.tab.on').dataset.tab === 'report') renderReport(); }
+
+/* ---------- 启动 ---------- */
+(function init(){
+  initTasks();
+  const now = new Date();
+  $('subTitle').textContent = (SEED ? SEED.month : now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0'))
+    + ' · 共 ' + TASKS.length + ' 条任务 · 数据保存在本浏览器';
+  renderToday();
+})();
+</script>
+</body>
+</html>

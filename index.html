@@ -305,6 +305,7 @@ let TASKS = null, IS_DEMO = false;
 
 function statusOf(t, t0){
   const due = t.due ? dayStart(t.due) : null;
+  if(t.rrule && (t.done_dates || []).includes(isoDay(t0))) return { key:'done', label:'今日已完成', cls:'', due:due };
   if(t.done) return { key:'done', label:'已完成', cls:'', due:due };
   if(due === null) return { key:'none', label:'无日期', cls:'', due:null };
   if(due < t0) return { key:'over', label:'逾期 ' + Math.round((t0-due)/DAY) + ' 天', cls:'red', due:due };
@@ -312,6 +313,7 @@ function statusOf(t, t0){
   const dd = Math.round((due-t0)/DAY);
   return { key:'later', label: dd === 1 ? '明天' : dd + ' 天后', cls:'teal', due:due };
 }
+function isoDay(ts){ const d = new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 function missedCount(t, t0){
   if(!t.rrule || t.done) return 0;
@@ -327,6 +329,17 @@ function computeMetrics(){
   TASKS.forEach(t => {
     total++;
     const st = statusOf(t, t0);
+    if(t.rrule){
+      const dn = (t.done_dates || []).filter(d => new Date(dayStart(d)).getMonth() === month).length;
+      doneMonth += dn;
+      const todayDone = (t.done_dates || []).includes(isoDay(t0));
+      if(st.key === 'over' && !todayDone) over++;
+      const m = todayDone ? 0 : missedCount(t, t0);
+      miss += m;
+      const isRoutine = !todayDone && occurrences(t.rrule, t0, t0).length > 0;
+      if((st.key === 'over' && !todayDone) || (st.key === 'today' && !todayDone) || m > 0 || isRoutine) todayItems++;
+      return;
+    }
     if(t.done){
       const at = t.done_at ? dayStart(t.done_at) : null;
       if(at === null || new Date(at).getMonth() === month) doneMonth++;
@@ -479,7 +492,14 @@ document.addEventListener('click', (e) => {
   const id = b.dataset.done;
   const t = TASKS.find(x => x.id === id);
   if(!t) return;
-  t.done = true; t.done_at = new Date().toISOString();
+  if(t.rrule){
+    t.done_dates = t.done_dates || [];
+    const d0 = isoDay(new Date());
+    const i = t.done_dates.indexOf(d0);
+    if(i < 0) t.done_dates.push(d0);
+  } else {
+    t.done = true; t.done_at = new Date().toISOString();
+  }
   if(!IS_DEMO){
     try{
       const raw = localStorage.getItem(TASK_KEY);
