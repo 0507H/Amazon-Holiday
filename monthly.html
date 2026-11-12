@@ -287,6 +287,7 @@ function navTo(q){
 $app.addEventListener('click', e => {
   const el = e.target.closest('[data-v]');
   if(!el || el.classList.contains('on')) return;
+  if(el.tagName === 'SELECT') return; /* 下拉框只走 change 导航，避免点击时重置参数 */
   const q = { v: el.dataset.v };
   if(el.dataset.st !== undefined) q.st = el.dataset.st;
   if(el.dataset.c !== undefined) q.c = el.dataset.c;
