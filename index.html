@@ -474,11 +474,25 @@ function esc(s){
 function setCrumb(text){ $('crumb').innerHTML = '运营工作台 <span class="sep">/</span> <span class="cur">' + esc(text) + '</span>'; }
 function clearOn(){ nav.querySelectorAll('.row').forEach(r => r.classList.remove('on')); }
 
+function expandGroup(itemsEl){
+  if(!itemsEl) return;
+  itemsEl.classList.remove('closed');
+  const c = $('caret' + itemsEl.id.replace(/Items$/,'').replace(/^./, ch => ch.toUpperCase()));
+  if(c) c.classList.remove('closed');
+}
+function collapseGroups(){
+  nav.querySelectorAll('.items').forEach(it => {
+    it.classList.add('closed');
+    const c = $('caret' + it.id.replace(/Items$/,'').replace(/^./, ch => ch.toUpperCase()));
+    if(c) c.classList.add('closed');
+  });
+}
 function showHome(){
   wrap.classList.remove('on'); dash.classList.remove('hidden');
   clearOn(); nav.querySelector('[data-home]').classList.add('on');
   setCrumb('首页驾驶舱'); frame.removeAttribute('src'); curTool = null;
   document.title = '运营工作台/首页驾驶舱';
+  collapseGroups();
   render();
 }
 
@@ -505,6 +519,7 @@ function openTool(key, sub){
   clearOn();
   const el = nav.querySelector('[data-tool="' + key + '"]' + (sub ? '[data-sub="' + sub + '"]' : ''));
   if(el) el.classList.add('on');
+  if(el && el.parentElement && el.parentElement.classList.contains('items')) expandGroup(el.parentElement);
   dash.classList.add('hidden'); wrap.classList.add('on');
   requestAnimationFrame(fitFrame);
   if(curTool === key){
