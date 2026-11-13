@@ -59,8 +59,10 @@ html.embedded .top{display:none}
 .src .pace b i{font-style:normal;font-size:12px;color:#9FBDD2;font-weight:400}
 
 .sec{margin-top:28px}
+#app{counter-reset:secn}
 .sec-h{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
-.sec-h h2{font-size:16px;font-weight:700;color:var(--navy)}
+.sec-h h2{font-size:16px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:9px}
+.sec-h h2::before{counter-increment:secn;content:counter(secn);width:21px;height:21px;border-radius:7px;background:var(--navy);color:#fff;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:none;letter-spacing:0}
 .sec-h .hint{font-size:12px;color:var(--faint)}
 
 /* KPI 卡 */
@@ -71,9 +73,14 @@ html.embedded .top{display:none}
 .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--teal)}
 .kpi.warn::before{background:var(--coral)}
 .kpi.mid::before{background:var(--amber)}
-.kpi .lb{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:6px}
-.kpi .lb svg{width:14px;height:14px;stroke:var(--faint)}
-.kpi .big{font-size:26px;font-weight:700;margin-top:8px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.kpi.g::before{background:var(--green)}
+.kpi .lb{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:8px}
+.kpi .lb .ic{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:rgba(27,163,184,.12);flex:none}
+.kpi .lb .ic svg{width:16px;height:16px;stroke:var(--teal)}
+.kpi.warn .lb .ic{background:rgba(184,66,58,.11)} .kpi.warn .lb .ic svg{stroke:var(--coral)}
+.kpi.mid .lb .ic{background:rgba(201,138,27,.12)} .kpi.mid .lb .ic svg{stroke:#C98A1B}
+.kpi.g .lb .ic{background:rgba(46,158,107,.12)} .kpi.g .lb .ic svg{stroke:var(--green)}
+.kpi .big{font-size:27px;font-weight:700;margin-top:9px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
 .kpi .big small{font-size:13px;font-weight:500;color:var(--faint);letter-spacing:0}
 .kpi .sub{font-size:12px;color:var(--faint);margin-top:6px;line-height:1.7}
 .up{color:var(--green)} .dn{color:var(--coral)} .wn{color:var(--amber)}
@@ -183,6 +190,20 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
 .concl li b{font-weight:600}
 .concl li .hl{color:var(--coral);font-weight:600}
 .concl li .hg{color:var(--green);font-weight:600}
+
+/* 图表卡与环形图 */
+.ct2{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;gap:8px;align-items:baseline}
+.ct2 .h{font-size:11px;font-weight:400;color:var(--faint)}
+.dwrap{display:flex;gap:14px;align-items:center}
+.dsvg{flex:none}
+.dsvg svg{width:150px;height:158px;display:block}
+.cols-chart{width:100%;height:auto;display:block}
+.dlg{flex:1;display:grid;gap:7px;min-width:0}
+.lg-r{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--sub)}
+.lg-r .d{width:9px;height:9px;border-radius:3px;flex:none}
+.lg-r .l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg-r b{margin-left:auto;color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+.lg-r i{font-style:normal;color:var(--faint);width:36px;text-align:right;font-size:11px}
 
 /* 横向条形排行 */
 .hbar{display:grid;gap:6px}
@@ -602,7 +623,7 @@ function toast(msg){
 
 /* ================= 公共组件 ================= */
 function kpiCard(cls, lbIcon, lb, bigHtml, subHtml){
-  return `<div class="kpi ${cls}"><div class="lb">${lbIcon}${lb}</div><div class="big">${bigHtml}</div><div class="sub">${subHtml}</div></div>`;
+  return `<div class="kpi ${cls}"><div class="lb"><span class="ic">${lbIcon}</span>${lb}</div><div class="big">${bigHtml}</div><div class="sub">${subHtml}</div></div>`;
 }
 const IC = {
   trend:'<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 2 5-6"/></svg>',
@@ -649,6 +670,39 @@ function crumbHtml(items){
 function chartCard(title, valueStr, svg){
   return `<div class="chart-card"><div class="ct"><span>${title}</span><b>${valueStr}</b></div>${svg}<div class="xl"><span>${dayLabels()[0]}</span><span>${dayLabels()[1]}</span><span>${dayLabels()[2]}</span></div></div>`;
 }
+/* 环形图（盈亏结构/贡献结构） */
+function donutChart(items, centerLb, centerV){
+  const total = items.reduce((s, x) => s + Math.max(x.v, 0), 0) || 1;
+  const R = 60, r = 37, CX = 76, CY = 80;
+  let a0 = -Math.PI/2, segs = '';
+  items.forEach(x => {
+    const frac = Math.max(x.v, 0)/total;
+    if(frac > 0.004){
+      const a1 = a0 + frac*Math.PI*2, large = frac > 0.5 ? 1 : 0;
+      const P = a => [CX + R*Math.cos(a), CY + R*Math.sin(a)];
+      const Q = a => [CX + r*Math.cos(a), CY + r*Math.sin(a)];
+      const x0 = P(a0), x1 = P(a1), xi = Q(a1), xj = Q(a0);
+      segs += `<path d="M${x0[0].toFixed(1)} ${x0[1].toFixed(1)} A${R} ${R} 0 ${large} 1 ${x1[0].toFixed(1)} ${x1[1].toFixed(1)} L${xi[0].toFixed(1)} ${xi[1].toFixed(1)} A${r} ${r} 0 ${large} 0 ${xj[0].toFixed(1)} ${xj[1].toFixed(1)} Z" fill="${x.c}" stroke="#fff" stroke-width="1.5"><title>${esc(x.lb)}：${x.fmt ? x.fmt(x.v) : numStr(x.v)}</title></path>`;
+    }
+    a0 += frac*Math.PI*2;
+  });
+  const legend = items.map(x => `<div class="lg-r"><span class="d" style="background:${x.c}"></span><span class="l">${esc(x.lb)}</span><b>${x.fmt ? x.fmt(x.v) : numStr(x.v)}</b><i>${(Math.max(x.v,0)/total*100).toFixed(0)}%</i></div>`).join('');
+  return `<div class="dwrap"><div class="dsvg"><svg viewBox="0 0 152 160">${segs}<text x="${CX}" y="${CY-4}" text-anchor="middle" font-size="10.5" fill="#5E7586">${esc(centerLb)}</text><text x="${CX}" y="${CY+14}" text-anchor="middle" font-size="14.5" font-weight="700" fill="var(--ink)">${centerV}</text></svg></div><div class="dlg">${legend}</div></div>`;
+}
+/* 纵向柱状（分层计数） */
+function svgCols(items){
+  const W = 340, H = 190, PAD = 24, max = Math.max(...items.map(x => x.v), 1);
+  const n = items.length, slot = (W - PAD*2)/n, bw = Math.min(72, slot*0.5);
+  let out = '';
+  items.forEach((x, i) => {
+    const h = Math.max(x.v/max, 0.02)*(H - PAD*2 - 26);
+    const cx = PAD + slot*i + slot/2, x0 = cx - bw/2, y0 = H - PAD - h;
+    out += `<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="5" fill="${x.c}"><title>${esc(x.lb)}：${x.fmt ? x.fmt(x.v) : numStr(x.v)}</title></rect>`;
+    out += `<text x="${cx.toFixed(1)}" y="${(y0-6).toFixed(1)}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">${x.fmt ? x.fmt(x.v) : numStr(x.v)}</text>`;
+    out += `<text x="${cx.toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="10.5" fill="#5E7586">${esc(x.lb)}</text>`;
+  });
+  return `<svg class="cols-chart" viewBox="0 0 ${W} ${H}">${out}</svg>`;
+}
 
 /* ================= 视图：01 总览驾驶舱（结论先行 · 指标后行） ================= */
 function vOv(){
@@ -667,10 +721,34 @@ function vOv(){
 
   const actItems = actionEngine(actRows());
   const top5 = actItems.slice(0, 5);
+
+  /* ===== 盈亏结构素材（五维结论 + 图区共用） ===== */
+  const skuAgg = [...groupBy(actRows(), F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs)}));
+  const act0 = skuAgg.filter(x => x.a.u > 0);
+  const win = act0.filter(x => x.a.p > 0), lose = act0.filter(x => x.a.p < 0);
+  const winP = win.reduce((s, x) => s + x.a.p, 0), loseP = lose.reduce((s, x) => s + x.a.p, 0);
+  const gmNoLoss = all.s ? (all.p - loseP)/all.s*100 : 0;
+  const catAgg = [...groupBy(actRows(), F.cat).entries()].map(([ci, rs]) => ({ci, a: agg(rs)})).sort((x, y) => y.a.p - x.a.p);
+  const winCats = catAgg.filter(x => x.a.p > 0).slice(0, 8);
+  const loseCats = catAgg.filter(x => x.a.p < 0).sort((x, y) => x.a.p - y.a.p).slice(0, 8);
+  const top3Share = all.s ? catAgg.slice(0, 3).reduce((s, x) => s + x.a.s, 0)/all.s*100 : 0;
+  const tiers = [
+    {lb: '亏损', c: '#B8423A', v: act0.filter(x => x.a.p < 0).length},
+    {lb: '0-8%', c: '#C98A1B', v: act0.filter(x => x.a.p >= 0 && x.a.gm < 8).length},
+    {lb: '8-15%', c: '#1BA3B8', v: act0.filter(x => x.a.gm >= 8 && x.a.gm < 15).length},
+    {lb: '15%+', c: '#2E9E6B', v: act0.filter(x => x.a.gm >= 15).length}
+  ];
+  const acos = all.ads ? all.ad/all.ads*100 : 0;
+  const adOrd = all.s ? all.ads*all.ord/all.s : 0;
+  const refundRate = all.u ? all.rf/all.u*100 : 0;
+
   const conclOv = conclBox([
     {k:'大盘', tone: all.p < 0 ? 'r' : (pRateAll >= tp && uRateAll >= tp ? 'g' : 'o'), txt:`利润达成 <b class="${pRateAll>=tp?'hg':'hl'}">${pctStr(pRateAll)}</b> / 销量达成 <b class="${uRateAll>=tp?'hg':'hl'}">${pctStr(uRateAll)}</b>（时间进度 ${pctStr(tp)}）。` +
       (uNeedAll ? `剩余 <b>${left}</b> 天需日均 <b class="${uRateAll>=tp?'hg':'hl'}">${numStr(uNeedAll)}</b> 件（当前 ${numStr(all.u/DB.days.length)} 件/天）。` : '')},
-    (top5.length ? {k:'P0', tone:'r', txt: top5.slice(0, 3).map((x,i) =>
+    {k:'盈利结构', tone: lose.length && loseP < 0 ? 'r' : 'g', txt:`有动销单品 <b>${act0.length}</b> 个：盈利 <b class="hg">${win.length}</b> 个贡献 ${money(winP)}，亏损 <b class="hl">${lose.length}</b> 个（占 ${pctStr(lose.length/Math.max(act0.length,1)*100)}）拖累 ${money(loseP)} —— ${lose.length ? `亏损品全部止损，净毛利率可从 <b class="hl">${pctStr(all.gm)}</b> 回到 <b class="hg">${pctStr(gmNoLoss)}</b>；利润修复的主战场就是这 ${lose.length} 个单品` : '无亏损单品'}。`},
+    {k:'集中', tone:'f', txt:`TOP3 品类占销售额 <b>${pctStr(top3Share)}</b>，头部品类【${esc(DB.cats[catAgg[0].ci])}】净毛利 ${money(catAgg[0].a.p)} —— ${top3Share > 60 ? '头部依赖偏高，保供与稳广告优先于扩张' : '结构分散度可接受，扩张空间在二线品类'}。`},
+    {k:'广告', tone: tacos <= THR.tacosG ? 'g' : 'o', txt:`TACOS <b>${pctStr(tacos)}</b>（≤${THR.tacosG}% 绿）· ACOS ${pctStr(acos)} vs 净毛利率 ${pctStr(all.gm)} —— ${tacos <= THR.tacosG ? '广告在健康区间，<span class="hl">禁止无差别砍预算</span>；利润漏洞在亏损单品与售后（退款率 ' + pctStr(refundRate) + '）' : '广告侵蚀偏重，按 04 广告专题的 ACOS&gt;100% 清单精准关停，不动健康投放'}。`},
+    (top5.length ? {k:'本周先做', tone:'r', txt: top5.slice(0, 3).map((x,i) =>
       `<b>${['一','二','三'][i]}</b>：【${x.best.t}】<span class="hl">${esc(x.nm.slice(0,16))}</span>（${x.asin}）${x.best.act}，涉及 <b>${money(x.best.amt)}</b>`).join('；') +
       `。完整分级清单见「05 行动跟进」。`} : {k:'行动', tone:'g', txt:'当前无触发行动规则的问题单品，按计划推进。'})
   ]);
@@ -696,6 +774,18 @@ function vOv(){
         <div class="bar"><div class="fill ${uRateAll<8?'dnb':''}" style="width:${Math.min(100,Math.max(0,uRateAll))}%"></div><div class="mark" data-lb="${pctStr(tp)}" style="left:${Math.min(95,tp)}%"></div></div></div>
     </div>
     ${conclOv}
+    <div class="sec"><div class="sec-h"><h2>钱的结构</h2><span class="hint">盈利从哪来、亏损在哪堵 · 按净毛利金额 · 有动销单品口径</span></div>
+      <div class="grid3">
+        <div class="panel" style="padding:16px 18px"><div class="ct2">品类利润 TOP8 <span class="h">毛利引擎</span></div>${hbarRows(winCats.map(x => ({lb: DB.cats[x.ci], v: x.a.p, c: '#2E9E6B', fmt: money})))}</div>
+        <div class="panel" style="padding:16px 18px"><div class="ct2">品类亏损 TOP8 <span class="h">优先堵漏</span></div>${hbarRows(loseCats.map(x => ({lb: DB.cats[x.ci], v: -x.a.p, c: '#B8423A', fmt: v => money(-v)})))}</div>
+        <div class="panel" style="padding:16px 18px"><div class="ct2">盈亏结构 · 单品净毛利 <span class="h">${act0.length} 个有动销单品</span></div>${donutChart([{lb: '盈利单品贡献（' + win.length + '个）', v: winP, c: '#2E9E6B', fmt: money}, {lb: '亏损单品拖累（' + lose.length + '个）', v: -loseP, c: '#B8423A', fmt: money}], '净毛利', money(all.p))}</div>
+      </div>
+      <div class="grid3" style="margin-top:14px">
+        <div class="panel" style="padding:16px 18px"><div class="ct2">单品净利率分层 <span class="h">健康带 8-15%</span></div>${svgCols(tiers)}</div>
+        <div class="panel" style="padding:16px 18px"><div class="ct2">店铺销售额贡献</div>${donutChart(DB.stores.map((nm, i) => ({lb: nm, v: Math.max(agg(actRows().filter(r => r[F.st] === i)).s, 0), c: ['#1BA3B8', '#C98A1B', '#6C5CE7', '#2E9E6B', '#8FA4B4'][i % 5], fmt: money})), '销售额', money(all.s))}</div>
+        <div class="panel" style="padding:16px 18px"><div class="ct2">订单结构 · 广告 vs 自然 <span class="h">广告订单为估算</span></div>${donutChart([{lb: '广告订单（估）', v: Math.max(adOrd, 0), c: '#C98A1B', fmt: numStr}, {lb: '自然订单', v: Math.max(all.ord - adOrd, 0), c: '#1BA3B8', fmt: numStr}], '订单', numStr(all.ord))}</div>
+      </div>
+    </div>
     <div class="sec"><div class="sec-h"><h2>P0 告警速览（≤5 条）</h2><span class="hint">按涉及金额排序 · 点击直达「05 行动跟进」处理</span></div>
       <div class="panel"><table><thead><tr><th>类型</th><th>单品</th><th>依据</th><th class="r">涉及金额</th></tr></thead><tbody>
       ${top5.map(x => `<tr class="rowbtn" data-v="act">
@@ -908,7 +998,7 @@ function vCatPage(){
     <div class="grid3">
       ${distChart('单品数分布', '结构是否过度集中于单一品类', statsCats.map(x => ({lb: DB.cats[x.ci], v: x.n, c:'#8FA4B4'})))}
       ${distChart('销售额分布', '钱从哪些品类来', statsCats.map(x => ({lb: DB.cats[x.ci], v: x.a.s, c:'#1BA3B8', fmt: money})))}
-      ${distChart('净毛利率对比', '高于整店均值 ${pctStr(a.gm)} 为绿色', statsCats.map(x => ({lb: DB.cats[x.ci], v: Math.max(x.a.gm, 0), c: x.a.gm >= a.gm ? 'var(--teal)' : 'var(--coral)', fmt: v => pctStr(x.a.gm)})))}
+      ${distChart('净毛利率对比', '高于整店均值 ' + pctStr(a.gm) + ' 为绿色', statsCats.map(x => ({lb: DB.cats[x.ci], v: Math.max(x.a.gm, 0), c: x.a.gm >= a.gm ? 'var(--teal)' : 'var(--coral)', fmt: v => pctStr(x.a.gm)})))}
     </div></div>`;
   const quadGrid = `<div class="sec"><div class="sec-h"><h2>品类四象限（增长 × 盈利）</h2><span class="hint">横轴 = 月内销量增速（近${k7}日 vs 此前日均）· 纵轴 = 净利率（分界 ${THR.cvrG}% 全店健康线附近）· 气泡 = 销售额</span></div>
     <div class="panel" style="padding:14px 18px">
