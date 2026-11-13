@@ -156,6 +156,12 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
 .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--navy);color:#fff;font-size:13px;border-radius:8px;padding:10px 18px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
 .toast.on{opacity:.96}
 
+.btn.sm{padding:4px 12px;font-size:12px}
+.actag{display:inline-block;font-size:11px;font-weight:600;border-radius:4px;padding:2px 8px;white-space:nowrap}
+.actag.r{background:#F7E4E2;color:var(--coral)}
+.actag.o{background:#F7ECDD;color:#B96F1F}
+.actag.b{background:#E1EFF3;color:#177E92}
+.actag.g{background:#E2F1EA;color:#2E9E6B}
 .foot{margin-top:26px;font-size:12px;color:var(--faint);line-height:1.9;background:#EDF2F7;border-radius:10px;padding:14px 18px}
 .foot b{color:var(--navy)}
 
@@ -355,6 +361,74 @@ function healthState(a, t){
   return {s:'warn', lb:'双落后', txt:'销量利润均落后时间进度，优先补流量（广告/促销），其次提价'};
 }
 
+/* ===== 行动引擎：把问题换算成钱，指名对象，给出动作，按金额排序 ===== */
+function actionEngine(rows){
+  const items = [];
+  groupBy(rows, F.a).forEach((rs, ai) => {
+    const a = agg(rs), sp = sumOf(ai);
+    const cand = [];
+    /* ① 广告倒挂 → 停投/降竞价：白烧金额 = 花费 - 广告销售×毛利率 */
+    if(a.ad >= 30 && a.ads > 0 && a.gm > 0){
+      const acos = a.ad/a.ads*100;
+      const waste = a.ad - a.ads*a.gm/100;
+      if(acos > a.gm && waste > 20) cand.push({t:'停投广告', tone:'r',
+        ev:`ACOS ${pctStr(acos)} ＞ 净毛利率 ${pctStr(a.gm)} · 广告花费 ${money(a.ad)}`,
+        act:'降竞价或暂停广告，保自然位再评估', amt: waste});
+    }
+    /* ② 亏损 → 归因止血 */
+    if(a.p < -20){
+      let ev, act;
+      if(a.rf > a.u){ ev = `净亏 ${money(a.p)} · 退款 ${numStr(a.rf)} 件 = 销量 ${(a.rf/Math.max(a.u,1)).toFixed(1)} 倍`; act = '核查 listing 与尺码表，节后品暂停补货'; }
+      else if(a.s && a.ad/a.s > 0.35){ ev = `净亏 ${money(a.p)} · 广告占销售额 ${pctStr(a.ad/a.s*100)}`; act = '停广告观察一周，无自然单则降价'; }
+      else if(sp && a.s && a.fba/a.s > 0.30){ ev = `净亏 ${money(a.p)} · FBA配送费占销售额 ${pctStr(a.fba/a.s*100)}`; act = '核算包装段位，提价或换小规格'; }
+      else { ev = `净亏 ${money(a.p)} · 净毛利率 ${pctStr(a.gm)}`; act = '重核采购/头程成本，无改善则清仓'; }
+      cand.push({t:'亏损止血', tone:'r', ev, act, amt: Math.abs(a.p)});
+    }
+    /* ③ 滞销 → 清仓回款 */
+    if(sp && sp.iv >= 100 && sp.kt >= 180) cand.push({t:'清仓回款', tone:'o',
+      ev:`滞销货值 ${money(sp.iv)} · 库周转 ${numStr(sp.kt)} 天`, act:'Outlet/批量降价，回笼占压资金', amt: sp.iv});
+    /* ④ 断货 → 紧急补货（盈利品断货才是机会损失） */
+    if(sp && sp.fk <= 0 && a.u >= 3 && a.p > 0) cand.push({t:'紧急补货', tone:'b',
+      ev:`本月已售 ${numStr(a.u)} 件 · FBA可售 0 · 净利 ${money(a.p)}`, act:'立即补货，断供每天少赚约 ' + money(a.p/Math.max(DB.days.length,1)), amt: a.p/Math.max(DB.days.length,1)*14});
+    /* ⑤ 高退货 → 核查listing（盈利品但退货在侵蚀） */
+    if(a.rf >= 10 && a.u >= 10 && a.rf/a.u > 0.4) cand.push({t:'退货核查', tone:'o',
+      ev:`退货 ${numStr(a.rf)} 件 / 销量 ${numStr(a.u)} 件 = ${pctStr(a.rf/a.u*100)}`, act:'查变体尺码表与详情页描述，差评集中变体考虑拆分', amt: a.rf*(sp ? sp.pr : 0)*0.3});
+    if(cand.length){
+      cand.sort((x,y) => y.amt - x.amt);
+      items.push({ai, st: rs[0][F.st], nm: DB.names[ai], asin: DB.asins[ai], best: cand[0], nAlt: cand.length - 1});
+    }
+  });
+  return items.sort((x,y) => y.best.amt - x.best.amt);
+}
+/* 行动清单渲染 + 复制 */
+function actionListHtml(items, cap){
+  const top = items.slice(0, cap || 8);
+  if(!top.length) return '<div class="sec"><div class="sec-h"><h2>本周行动清单</h2></div><div class="panel"><div class="dnote">当前范围内没有触发行动规则的问题单品。</div></div></div>';
+  const total = top.reduce((s,x) => s + x.best.amt, 0);
+  return `<div class="sec"><div class="sec-h"><h2>本周行动清单（按涉及金额排序）</h2>
+    <span class="hint">${items.length} 项触发规则 · 表内取前 ${top.length} · 合计涉及 <b>${money(total)}</b> · 点击行看明细</span>
+    <button class="btn sm" id="btnCopyAct" style="margin-left:auto">复制清单</button></div>
+    <div class="panel"><table><thead><tr><th>动作</th><th>单品</th><th>依据（为什么）</th><th>建议动作（做什么）</th><th class="r">涉及金额</th></tr></thead><tbody>
+    ${top.map((x,i) => `<tr class="rowbtn" data-v="dt" data-st="${x.st}" data-a="${x.ai}">
+      <td><span class="actag ${x.best.tone}">${i+1}. ${x.best.t}</span></td>
+      <td class="tname">${esc(x.nm.length > 20 ? x.nm.slice(0,20) + '…' : x.nm)}<br><span class="asin">${x.asin}</span></td>
+      <td>${x.best.ev}</td>
+      <td>${x.best.act}</td>
+      <td class="r ${x.best.tone === 'b' ? 'up' : 'dn'}"><b>${money(x.best.amt)}</b></td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+function bindCopyAct(items, cap){
+  const btn = document.getElementById('btnCopyAct');
+  if(!btn) return;
+  btn.onclick = () => {
+    const lines = items.slice(0, cap || 8).map((x,i) =>
+      `${i+1}.【${x.best.t}】${x.nm}（${x.asin}）${x.best.ev} → ${x.best.act}（涉及 ${money(x.best.amt)}）`);
+    const txt = '本周行动清单（' + DB.days[0] + '~' + DB.days[DB.days.length-1] + '）\n' + lines.join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('已复制 ' + lines.length + ' 条行动项'))
+      .catch(() => { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('已复制'); });
+  };
+}
+
 /* ================= 图表 ================= */
 function svgBars(vals, color){
   const n = vals.length, W = 300, H = 70, max = Math.max(...vals, 1);
@@ -519,12 +593,6 @@ function vOv(){
   /* ===== 分析结论与影响金额 ===== */
   const imp = impactOf(undefined);
   const skuAgg = [...groupBy(DB.rows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs)}));
-  const profN = skuAgg.filter(x => x.a.p >= 0), lossN = skuAgg.filter(x => x.a.p < 0);
-  const profAmt = profN.reduce((s,x) => s+x.a.p, 0), lossAmt = lossN.reduce((s,x) => s+x.a.p, 0);
-  const top10 = [...skuAgg].sort((x,y) => y.a.p - x.a.p).slice(0, 10);
-  const top10Share = profAmt > 0 ? top10.reduce((s,x) => s + Math.max(x.a.p,0), 0) / profAmt * 100 : 0;
-  const catAgg = [...groupBy(DB.rows, F.cat).values()].map(rs => ({ci: rs[0][F.cat], a: agg(rs)}));
-  const worstCat = [...catAgg].sort((x,y) => x.a.p - y.a.p)[0];
   const uRateAll = tgSum.u ? all.u/tgSum.u*100 : 0;
   const pRateAll = tgSum.p ? all.p/tgSum.p*100 : 0;
   const left = (DB.monthDays||30) - DB.days.length;
@@ -541,18 +609,14 @@ function vOv(){
   const lvList = Object.keys(lvMap).map(k => ({lb: k, v: lvMap[k].s ? lvMap[k].p/lvMap[k].s*100 : 0, n: lvMap[k].n, c: lvMap[k].p >= 0 ? 'var(--teal)' : 'var(--coral)'}))
     .filter(x => x.n >= 3).sort((x,y) => y.v - x.v).map(x => ({lb: `${x.lb}（${x.n}品）`, v: x.v, c: x.c, fmt: v => pctStr(v)}));
 
+  const actItems = actionEngine(DB.rows);
+  const top3 = actItems.slice(0, 3);
   const conclOv = conclBox([
-    {k:'大盘', tone:'b', txt:`本月目标销量达成 <b class="${uRateAll>=tp?'hg':'hl'}">${pctStr(uRateAll)}</b>（时间进度 ${pctStr(tp)}），利润达成 <b class="${pRateAll>=tp?'hg':'hl'}">${pctStr(pRateAll)}</b>。` +
-      (uNeedAll ? `剩余 <b>${left}</b> 天需日均 <b class="${uRateAll>=tp?'hg':'hl'}">${numStr(uNeedAll)}</b> 件（当前 ${numStr(all.u/DB.days.length)} 件/天）。` : '') +
-      (all.gm < 0 ? `<span class="hl">净毛利率为负（${pctStr(all.gm)}），利润目标基本落空，重心转为止血与复盘。</span>` : '')},
-    {k:'结构', tone:'g', txt:`有动销单品中盈利 <b>${profN.length}</b> 个（贡献 ${money(profAmt)}）、亏损 <b class="hl">${lossN.length}</b> 个（抵消 ${money(Math.abs(lossAmt))}），` +
-      `亏损抵消相当于盈利毛利的 <b class="${lossN.length > profN.length*0.5 ? 'hl' : ''}">${pctStr(Math.abs(lossAmt)/Math.max(profAmt,1)*100)}</b>。`},
-    {k:'集中', tone:'f', txt:`毛利 TOP10 单品贡献了盈利毛利的 <b>${pctStr(top10Share)}</b>；` +
-      (worstCat && worstCat.a.p < 0 ? `最差品类【${esc(DB.cats[worstCat.ci])}】净亏 <b class="hl">${money(worstCat.a.p)}</b>（${pctStr(worstCat.a.gm)}），优先止血或清仓。` : '无整体亏损品类。')},
-    {k:'动作', tone:'r', txt:(lossN.length > skuAgg.length*0.2
-      ? `<span class="hl">亏损面已超 20%，先止住亏损缺口（${money(Math.abs(lossAmt))}）再谈增长</span>；` : '') +
-      (imp.oosN ? ` <b>${imp.oosN}</b> 个单品断货（本月有销量），估计损失 <b class="hl">${money(imp.oosLoss)}</b>，优先补货或调拨。` : '') +
-      (imp.idle > 0 ? ` 滞销占压 <b>${money(imp.idle)}</b>，周转 180 天+ 的启动清仓。` : '')}
+    {k:'大盘', tone: all.p < 0 ? 'r' : (pRateAll >= tp && uRateAll >= tp ? 'g' : 'o'), txt:`利润达成 <b class="${pRateAll>=tp?'hg':'hl'}">${pctStr(pRateAll)}</b> / 销量达成 <b class="${uRateAll>=tp?'hg':'hl'}">${pctStr(uRateAll)}</b>（时间进度 ${pctStr(tp)}）。` +
+      (uNeedAll ? `剩余 <b>${left}</b> 天需日均 <b class="${uRateAll>=tp?'hg':'hl'}">${numStr(uNeedAll)}</b> 件（当前 ${numStr(all.u/DB.days.length)} 件/天）。` : '')},
+    (top3.length ? {k:'本周先做', tone:'r', txt: top3.map((x,i) =>
+      `<b>${['一','二','三'][i]}</b>：【${x.best.t}】<span class="hl">${esc(x.nm.slice(0,16))}</span>（${x.asin}）${x.best.act}，涉及 <b>${money(x.best.amt)}</b>`).join('；') +
+      `。完整清单与依据见下方行动清单。`} : {k:'行动', tone:'g', txt:'当前无触发行动规则的问题单品，按计划推进。'})
   ]);
 
   const impCards = `<div class="sec"><div class="sec-h"><h2>影响金额（钱在哪里出问题）</h2><span class="hint">口径见各卡说明 · 所有可行动问题按金额排序</span></div><div class="grid4">
@@ -578,6 +642,7 @@ function vOv(){
       <div class="grid4">${rateKpis(all, {u:tgSum.u, p:tgSum.p, g:0}, '整体')}</div>
     </div>
     ${conclOv}
+    ${actionListHtml(actItems)}
     ${impCards}
     <div class="sec">
       <div class="sec-h"><h2>店铺达成</h2><span class="hint">利润目标口径 = 销售净毛利金额 + 净毛利率 · 点击卡片逐层钻取</span></div>
@@ -590,6 +655,7 @@ function vOv(){
       · 进度条上的深色竖线 = 月时间进度参照；退款率 8% 为预警线<br>
       · 周报 / 月报文案模板待样例后接入导出（当前「日/周/月报」页提供周期汇总数据）
     </div>`;
+  bindCopyAct(actItems);
 }
 
 /* ================= 拆解链路：总览→店铺→品类→父体→单品→数据层面（平级） ================= */
@@ -632,11 +698,7 @@ function vStore(st){
 
   /* ===== 结论区 ===== */
   const hs = healthState(a, t);
-  const imp = impactOf(st);
   const stAsins = new Set(rows.map(r => r[F.a]));
-  const stSkuAgg = [...groupBy(rows, F.a).values()].map(rs => agg(rs));
-  const stLoss = stSkuAgg.filter(x => x.p < 0);
-  const stLossAmt = stLoss.reduce((s,x) => s+x.p, 0);
   /* 退货原因 TOP（退货订单表） */
   const rf = DB.rf || null;
   const stR = rf && rf.bySR && rf.bySR[String(st)] ? rf.bySR[String(st)] : null;
@@ -674,12 +736,15 @@ function vStore(st){
     }
   }
 
+  const actItemsSt = actionEngine(rows);
+  const stTop = actItemsSt.slice(0, 2);
   const conclSt = conclBox([
     {k:'判定', tone: hs.s === 'danger' ? 'r' : (hs.s === 'ok' ? 'g' : 'o'), txt:`<b>${hs.lb}</b> —— ${hs.txt}`},
-    {k:'结构', tone:'f', txt: stLoss.length ? `本店亏损单品 <b class="hl">${stLoss.length}</b> 个，缺口 <b class="hl">${money(stLossAmt)}</b>；` + (imp.oosN ? `断货 <b>${imp.oosN}</b> 个（估损 ${money(imp.oosLoss)}）；` : '') + (imp.idle ? `滞销占压 <b>${money(imp.idle)}</b>。` : '') : '本店无亏损单品。'},
-    {k:'退款', tone: a.rf/Math.max(a.u,1) > 0.08 ? 'r' : 'g', txt: a.rf/Math.max(a.u,1) > 1
-      ? `<span class="hl">退款 ${numStr(a.rf)} 件 = 销量 ${(a.rf/Math.max(a.u,1)).toFixed(1)} 倍，节后退货潮特征，原因分布见下方退货专题。</span>`
-      : `退款 ${numStr(a.rf)} 件 · 退款率 ${a.u ? pctStr(a.rf/a.u*100) : '0%'}（警戒线 8%）。`}
+    (stTop.length ? {k:'本周先做', tone:'r', txt: stTop.map((x,i) =>
+      `<b>${['一','二'][i]}</b>：【${x.best.t}】<span class="hl">${esc(x.nm.slice(0,16))}</span>（${x.asin}）${x.best.act}，涉及 <b>${money(x.best.amt)}</b>`).join('；') + '。'}
+     : (a.rf/Math.max(a.u,1) > 0.08
+        ? {k:'退款', tone:'r', txt:`本店暂无亏损/倒挂单品，但退款 ${numStr(a.rf)} 件（退款率 ${a.u?pctStr(a.rf/a.u*100):'0%'}）超 8% 警戒线，原因分布见下方退货专题。`}
+        : {k:'行动', tone:'g', txt:'本店无触发行动规则的问题单品。'}))
   ]);
 
   $app.innerHTML = `
@@ -687,6 +752,7 @@ function vStore(st){
     ${storeTabs(st, 'st')}
     <div class="dnote">${nm} · 实际 ${DB.days[0]}~${DB.days[DB.days.length-1]} · 目标指标只考核销量+利润，其他维度辅助总结 · 单品行可进入数据页</div>
     ${conclSt}
+    ${actionListHtml(actItemsSt)}
     <div class="sec"><div class="grid4">${rateKpis(a, t, nm)}</div></div>
     <div class="charts">
       ${chartCard('日销量（件）', numStr(a.u) + ' 件', svgBars(bd.map(d => d.u), '#1BA3B8'))}
@@ -701,6 +767,7 @@ function vStore(st){
         <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
         <td class="r">${numStr(x.a.u)}</td><td class="r dn">${numStr(x.a.rf)}</td><td class="r">${x.a.u ? pctStr(x.a.rf/x.a.u*100) : '-'}</td></tr>`).join('')}
       </tbody></table></div></div>` : ''}`;
+  bindCopyAct(actItemsSt);
 }
 
 /* 品类层 */
@@ -719,11 +786,16 @@ function vCatPage(st){
   const maxP = Math.max(...catList.map(x => Math.abs(x.a.p)), 1);
   const worstC = [...catList].sort((x,y) => x.a.p - y.a.p)[0];
   const top3Share = a.s > 0 ? catList.slice(0, 3).reduce((s,x) => s + x.a.s, 0) / a.s * 100 : 0;
+  /* 止血结论：最差品类 + 品类内亏损王单品（指名道姓） */
+  let stopTxt = '无净亏损品类，按毛利贡献排优先级投放资源。';
+  if(worstC && worstC.a.p < 0){
+    const cRows = DB.rows.filter(r => r[F.st] === st && r[F.cat] === worstC.ci);
+    const worstSku = [...groupBy(cRows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs), st})).sort((x,y) => x.a.p - y.a.p)[0];
+    stopTxt = `最差品类【${esc(DB.cats[worstC.ci])}】净亏 <b class="hl">${money(worstC.a.p)}</b> · 滞销占压 ${money(worstC.iv)} —— 主要来自【${esc(DB.names[worstSku.ai].slice(0,18))}】（${DB.asins[worstSku.ai]}，亏 ${money(worstSku.a.p)}）：先停广告，两周无起色清仓。`;
+  }
   const conclCat = conclBox([
-    {k:'集中', tone:'f', txt:`TOP3 品类占本店销售额 <b>${pctStr(top3Share)}</b>${top3Share > 60 ? '，<span class="hl">品类高度集中，头部品类的流量与库存波动直接影响大盘</span>' : '，结构分散度可接受'}。`},
-    {k:'止血', tone: worstC && worstC.a.p < 0 ? 'r' : 'g', txt: worstC && worstC.a.p < 0
-      ? `最差品类【${esc(DB.cats[worstC.ci])}】净亏 <b class="hl">${money(worstC.a.p)}</b>（${pctStr(worstC.a.gm)}）· 滞销占压 ${money(worstC.iv)} —— 周转 >100 天的品降价试销，>180 天直接清仓。`
-      : '无净亏损品类，按毛利贡献排优先级投放资源。'}
+    {k:'集中', tone:'f', txt:`TOP3 品类占本店销售额 <b>${pctStr(top3Share)}</b>${top3Share > 60 ? '，<span class="hl">头部品类的流量与库存波动直接决定大盘，优先保供与稳广告</span>' : '，结构分散度可接受'}。`},
+    {k:'止血', tone: worstC && worstC.a.p < 0 ? 'r' : 'g', txt: stopTxt}
   ]);
 
   $app.innerHTML = `
@@ -766,11 +838,19 @@ function vParentPage(st, c){
   const maxP = Math.max(...pars.map(x => Math.abs(x.pa.p)), 1);
   const worstP = [...pars].sort((x,y) => x.pa.p - y.pa.p)[0];
   const top5Share = aP.s > 0 ? pars.slice(0, 5).reduce((s,x) => s + x.pa.s, 0) / aP.s * 100 : 0;
+  /* 止血结论：最差父体 + 父体内亏损王单品 */
+  let stopTxtP = '无净亏损父体。';
+  if(worstP && worstP.pa.p < 0){
+    const pRows = rows.filter(r => r[F.pa] === worstP.pi);
+    const worstSku = [...groupBy(pRows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs), st})).sort((x,y) => x.a.p - y.a.p)[0];
+    let cause = `净毛利率 ${pctStr(worstSku.a.gm)}`;
+    if(worstSku.a.rf > worstSku.a.u) cause = `退款 ${numStr(worstSku.a.rf)} 件 = 销量 ${(worstSku.a.rf/Math.max(worstSku.a.u,1)).toFixed(1)} 倍`;
+    else if(worstSku.a.s && worstSku.a.ad/worstSku.a.s > 0.35) cause = `广告占销售额 ${pctStr(worstSku.a.ad/worstSku.a.s*100)}`;
+    stopTxtP = `亏损最重的父体【${esc(repNameOf(rows, worstP.pi).slice(0, 18))}】净亏 <b class="hl">${money(worstP.pa.p)}</b> —— 内部亏损王【${esc(DB.names[worstSku.ai].slice(0,16))}】（${DB.asins[worstSku.ai]}，${cause}）：停广告→核成本→仍亏则清仓。`;
+  }
   const conclPt = conclBox([
-    {k:'集中', tone:'f', txt:`TOP5 父体占本店${catSel !== 'all' ? '该品类' : ''}销售额 <b>${pctStr(top5Share)}</b>${top5Share > 50 ? '，单品依赖偏高，任一主力断货即影响大盘' : ''}。`},
-    {k:'止血', tone: worstP && worstP.pa.p < 0 ? 'r' : 'g', txt: worstP && worstP.pa.p < 0
-      ? `亏损最重的父体【${esc(repNameOf(rows, worstP.pi).slice(0, 18))}】净亏 <b class="hl">${money(worstP.pa.p)}</b>（${pctStr(worstP.pa.gm)}）—— 逐个看亏损构成：成本/头程/广告，改价或停投。`
-      : '无净亏损父体。'}
+    {k:'集中', tone:'f', txt:`TOP5 父体占${catSel !== 'all' ? '该品类' : '本店'}销售额 <b>${pctStr(top5Share)}</b>${top5Share > 50 ? '，<span class="hl">主力依赖偏高，任一主力断货即影响大盘，优先盯库存</span>' : ''}。`},
+    {k:'止血', tone: worstP && worstP.pa.p < 0 ? 'r' : 'g', txt: stopTxtP}
   ]);
 
   $app.innerHTML = `
