@@ -190,6 +190,12 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
 .hrow .tk i{display:block;height:100%;border-radius:4px}
 .hrow .v{flex:none;width:76px;text-align:right;color:var(--ink);font-weight:600;font-size:12px}
 .chipstat{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.exclgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px;max-height:280px;overflow-y:auto;padding:2px}
+.exclrow{display:flex;align-items:center;gap:8px;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+.exclrow.on{border-color:var(--coral);background:#FDF3F2}
+.exclrow .cn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exclrow .v{color:var(--faint);white-space:nowrap}
+.exclrow.on .v{color:var(--coral)}
 .chipstat span{font-size:11.5px;border-radius:7px;padding:3px 10px;background:#EEF1F4;color:var(--sub)}
 .chipstat span b{color:var(--ink)}
 .chipstat span.warn{background:#FBEDEA;color:var(--coral)}
@@ -282,6 +288,22 @@ function rateCls(v){ return v >= 30 ? 'up' : (v >= 8 ? 'wn' : 'dn'); }
 function timeProg(){ return DB.days.length / (DB.monthDays || 30) * 100; }
 function tgtOf(i){ return TGT[String(i)] || {u:0,p:0,g:0}; }
 
+/* ===== 品类排除：不做的品类不参与任何统计（按品类名持久化） ===== */
+const LS_EXCL = 'lfh_monthly_excl';
+let EXCL = (function(){ try{ const r = localStorage.getItem(LS_EXCL); if(r){ const o = JSON.parse(r); if(Array.isArray(o)) return o; } }catch(e){} return []; })();
+function saveExcl(){ try{ localStorage.setItem(LS_EXCL, JSON.stringify(EXCL)); return true; }catch(e){ return false; } }
+let _exclSet = null, _exclDirty = true;
+function exclSet(){
+  if(_exclDirty || _exclSet === null){ _exclSet = new Set(EXCL); _exclDirty = false; }
+  return _exclSet;
+}
+/* 有效行 = 剔除被排除品类后的行（所有统计的唯一入口） */
+function actRows(){
+  const s = exclSet();
+  if(!s.size) return DB.rows;
+  return DB.rows.filter(r => !s.has(DB.cats[r[F.cat]]));
+}
+
 /* ================= 分析引擎 ================= */
 function sumOf(a){ return (DB.S && DB.S[a]) || null; }
 const AGE_LB = ['0~30','31~60','61~90','91~180','181~270','271~330','331~365','365+'];
@@ -325,7 +347,8 @@ function hbarRows(data, color){
 }
 /* 影响金额口径（全站或单店） */
 function impactOf(st){
-  const rows = st === undefined ? DB.rows : DB.rows.filter(r => r[F.st] === st);
+  const baseR = actRows();
+  const rows = st === undefined ? baseR : baseR.filter(r => r[F.st] === st);
   const a = agg(rows);
   const asinSet = new Set(rows.map(r => r[F.a]));
   /* 亏损可回收 = 亏损单品净毛利缺口合计 */
@@ -559,14 +582,14 @@ function chartCard(title, valueStr, svg){
 /* ================= 视图：总览 ================= */
 function vOv(){
   $crumbV.textContent = '总览';
-  const all = agg(DB.rows);
+  const all = agg(actRows());
   const tgSum = {u:0,p:0,g:0};
   DB.stores.forEach((_, i) => { const t = tgtOf(i); tgSum.u += t.u; tgSum.p += t.p; });
   const tp = timeProg();
   const srcNote = DB.days.length + '/' + (DB.monthDays||30) + ' 天';
 
   const storeCards = DB.stores.map((nm, i) => {
-    const rows = DB.rows.filter(r => r[F.st] === i);
+    const rows = actRows().filter(r => r[F.st] === i);
     const a = agg(rows), t = tgtOf(i);
     const uRate = t.u ? a.u/t.u*100 : 0;
     const pRate = t.p ? a.p/t.p*100 : 0;
@@ -592,7 +615,7 @@ function vOv(){
 
   /* ===== 分析结论与影响金额 ===== */
   const imp = impactOf(undefined);
-  const skuAgg = [...groupBy(DB.rows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs)}));
+  const skuAgg = [...groupBy(actRows(), F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs)}));
   const uRateAll = tgSum.u ? all.u/tgSum.u*100 : 0;
   const pRateAll = tgSum.p ? all.p/tgSum.p*100 : 0;
   const left = (DB.monthDays||30) - DB.days.length;
@@ -609,7 +632,7 @@ function vOv(){
   const lvList = Object.keys(lvMap).map(k => ({lb: k, v: lvMap[k].s ? lvMap[k].p/lvMap[k].s*100 : 0, n: lvMap[k].n, c: lvMap[k].p >= 0 ? 'var(--teal)' : 'var(--coral)'}))
     .filter(x => x.n >= 3).sort((x,y) => y.v - x.v).map(x => ({lb: `${x.lb}（${x.n}品）`, v: x.v, c: x.c, fmt: v => pctStr(v)}));
 
-  const actItems = actionEngine(DB.rows);
+  const actItems = actionEngine(actRows());
   const top3 = actItems.slice(0, 3);
   const conclOv = conclBox([
     {k:'大盘', tone: all.p < 0 ? 'r' : (pRateAll >= tp && uRateAll >= tp ? 'g' : 'o'), txt:`利润达成 <b class="${pRateAll>=tp?'hg':'hl'}">${pctStr(pRateAll)}</b> / 销量达成 <b class="${uRateAll>=tp?'hg':'hl'}">${pctStr(uRateAll)}</b>（时间进度 ${pctStr(tp)}）。` +
@@ -634,6 +657,7 @@ function vOv(){
       <span class="tag">数据源</span>
       <span class="item"><span class="dot"></span>${DATA_SRC} · 按日明细 ${DB.days[0]} ~ ${DB.days[DB.days.length-1]}（${srcNote}）</span>
       <span class="item"><span class="dot"></span>${numStr(DB.asins.length)} ASIN · ${DB.parents.length} 父体 · ${DB.cats.length} 品类</span>
+      ${EXCL.length ? `<span class="item"><span class="dot warnc"></span>已排除 ${EXCL.length} 个不做品类（数据管理页可改）</span>` : ''}
       <span class="item"><span class="dot warnc"></span>周报 / 月报 · 待模板样例</span>
       <div class="pace">月时间进度<b>${pctStr(tp)}<i>（${DB.days.length}/${DB.monthDays||30} 天）</i></b></div>
     </div>
@@ -689,7 +713,7 @@ function vStore(st){
   const nm = DB.stores[st];
   if(nm === undefined){ navTo({v:'ov'}); return; }
   $crumbV.textContent = '店铺 · ' + nm;
-  const rows = DB.rows.filter(r => r[F.st] === st);
+  const rows = actRows().filter(r => r[F.st] === st);
   const a = agg(rows), t = tgtOf(st);
   const bd = byDay(rows);
 
@@ -727,7 +751,7 @@ function vStore(st){
     if(stRet.length){
       retTopRows = `<div class="sec"><div class="sec-h"><h2>退货 TOP5 单品</h2><span class="hint">退货订单口径 · 点击进入数据页</span></div>
         <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">本月销量</th><th class="r">退货量</th><th class="r">退货/销量</th></tr></thead><tbody>
-        ${stRet.map(x => { const ra = agg(DB.rows.filter(r => r[F.a] === x.ai));
+        ${stRet.map(x => { const ra = agg(actRows().filter(r => r[F.a] === x.ai));
           return `<tr class="rowbtn" data-v="dt" data-st="${st}" data-a="${x.ai}">
           <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
           <td class="r">${numStr(ra.u)}</td><td class="r dn">${numStr(x.v)}</td>
@@ -774,7 +798,7 @@ function vStore(st){
 function vCatPage(st){
   const nm = DB.stores[st];
   $crumbV.textContent = '品类';
-  const rows = DB.rows.filter(r => r[F.st] === st);
+  const rows = actRows().filter(r => r[F.st] === st);
   const a = agg(rows);
   const catList = [...groupBy(rows, F.cat).entries()].map(([ci, rs]) => {
     const a = agg(rs);
@@ -786,10 +810,13 @@ function vCatPage(st){
   const maxP = Math.max(...catList.map(x => Math.abs(x.a.p)), 1);
   const worstC = [...catList].sort((x,y) => x.a.p - y.a.p)[0];
   const top3Share = a.s > 0 ? catList.slice(0, 3).reduce((s,x) => s + x.a.s, 0) / a.s * 100 : 0;
+  /* 零销量品类不占版面（合计不受影响，它们销量本就是 0） */
+  const zeroCats = catList.filter(x => x.a.u === 0);
+  const showCats = catList.filter(x => x.a.u > 0);
   /* 止血结论：最差品类 + 品类内亏损王单品（指名道姓） */
   let stopTxt = '无净亏损品类，按毛利贡献排优先级投放资源。';
   if(worstC && worstC.a.p < 0){
-    const cRows = DB.rows.filter(r => r[F.st] === st && r[F.cat] === worstC.ci);
+    const cRows = actRows().filter(r => r[F.st] === st && r[F.cat] === worstC.ci);
     const worstSku = [...groupBy(cRows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs), st})).sort((x,y) => x.a.p - y.a.p)[0];
     stopTxt = `最差品类【${esc(DB.cats[worstC.ci])}】净亏 <b class="hl">${money(worstC.a.p)}</b> · 滞销占压 ${money(worstC.iv)} —— 主要来自【${esc(DB.names[worstSku.ai].slice(0,18))}】（${DB.asins[worstSku.ai]}，亏 ${money(worstSku.a.p)}）：先停广告，两周无起色清仓。`;
   }
@@ -805,7 +832,7 @@ function vCatPage(st){
     ${conclCat}
     <div class="sec"><div class="sec-h"><h2>品类排行</h2><span class="hint">按净毛利排序 · 滞销/库周转来自汇总快照</span></div>
       <div class="panel"><table><thead><tr><th>品类</th><th class="r">销量</th><th class="r">日均</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th class="r">滞销货值</th><th class="r">库周转(均)</th><th>毛利贡献</th></tr></thead><tbody>
-      ${catList.map(x => `<tr class="rowbtn" data-v="pt" data-st="${st}" data-c="${x.ci}">
+      ${showCats.map(x => `<tr class="rowbtn" data-v="pt" data-st="${st}" data-c="${x.ci}">
         <td class="tname">${esc(DB.cats[x.ci])}</td>
         <td class="r">${numStr(x.a.u)}</td>
         <td class="r">${numStr(x.a.u/DB.days.length)}</td>
@@ -816,13 +843,16 @@ function vCatPage(st){
         <td class="r ${x.kt > 100 ? 'dn' : ''}">${x.kt ? numStr(x.kt) + ' 天' : '-'}</td>
         <td>${barCell(x.a.p, maxP)}</td></tr>`).join('')}
       <tr class="tot"><td class="tname">合计</td><td class="r">${numStr(a.u)}</td><td class="r">${numStr(a.u/DB.days.length)}</td><td class="r">${money(a.s)}</td><td class="r ${a.p>=0?'up':'dn'}">${money(a.p)}</td><td class="r gm ${gmCls(a.gm)}">${pctStr(a.gm)}</td><td class="r">${money(catList.reduce((s,x) => s+x.iv, 0))}</td><td class="r">-</td><td></td></tr>
-      </tbody></table></div></div>`;
+      </tbody></table>
+      ${zeroCats.length ? `<div class="dnote" style="margin-top:8px">已折叠 ${zeroCats.length} 个零销量品类（${zeroCats.slice(0,4).map(x => esc(DB.cats[x.ci])).join('、')}${zeroCats.length > 4 ? ' 等' : ''}）——不产生销量与利润，只积压库存；需要清仓的看滞销货值列或数据管理页。</div>` : ''}
+      ${EXCL.length ? `<div class="dnote" style="margin-top:6px">另有 <b>${EXCL.length}</b> 个品类已标记「不做」并从全部统计中剔除（数据管理页可恢复）。</div>` : ''}
+      </div></div>`;
 }
 
 /* 父体层 */
 function vParentPage(st, c){
   $crumbV.textContent = '父体';
-  const storeRows = DB.rows.filter(r => r[F.st] === st);
+  const storeRows = actRows().filter(r => r[F.st] === st);
   let rows = storeRows, catSel = 'all';
   if(c !== undefined && c !== '' && DB.cats[Number(c)] !== undefined){
     rows = storeRows.filter(r => r[F.cat] === Number(c));
@@ -877,7 +907,7 @@ function vParentPage(st, c){
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function vSkuPage(st, pa){
   $crumbV.textContent = '单品';
-  const storeRows = DB.rows.filter(r => r[F.st] === st);
+  const storeRows = actRows().filter(r => r[F.st] === st);
   let rows = storeRows, paSel = 'all';
   if(pa !== undefined && pa !== '' && DB.parents[Number(pa)] !== undefined){
     rows = storeRows.filter(r => r[F.pa] === Number(pa));
@@ -911,7 +941,7 @@ function vSkuPage(st, pa){
 /* 数据层面：单 ASIN 按日明细逐字段 */
 function vDetail(st, a){
   $crumbV.textContent = '数据';
-  const storeRows = DB.rows.filter(r => r[F.st] === st);
+  const storeRows = actRows().filter(r => r[F.st] === st);
   const ranked = [...groupBy(storeRows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
   if(a === undefined || a === '' || DB.asins[Number(a)] === undefined || !storeRows.some(r => r[F.a] === Number(a))){
     a = ranked.length ? ranked[0].ai : null;
@@ -1042,6 +1072,29 @@ function vData(){
         <div style="margin-top:14px"><button class="btn primary" id="btnTgt">保存目标</button></div>
       </div>
     </div>
+    <div class="sec"><div class="sec-h"><h2>不做的品类（排除统计）</h2><span class="hint">勾选后该品类从所有统计、目标达成、行动清单中剔除 · 仅本浏览器生效</span></div>
+      <div class="panel">
+        <div class="exclgrid">
+          ${(() => {
+            const per = {};
+            DB.rows.forEach(r => {
+              const cn = DB.cats[r[F.cat]];
+              const o = per[cn] || (per[cn] = {u:0, p:0});
+              o.u += r[F.u]; o.p += r[F.p];
+            });
+            return Object.keys(per).map(cn => {
+              const o = per[cn], on = exclSet().has(cn);
+              return `<label class="exclrow${on ? ' on' : ''}">
+                <input type="checkbox" data-cn="${esc(cn)}"${on ? ' checked' : ''}>
+                <span class="cn">${esc(cn)}</span>
+                <span class="v">${numStr(o.u)} 件 · <b class="${o.p>=0?'up':'dn'}">${money(o.p)}</b></span>
+              </label>`;
+            }).join('');
+          })()}
+        </div>
+        <div class="dnote" style="margin-top:10px">已排除 <b>${EXCL.length}</b> 个品类。适用场景：不再运营的品类（如停售的硅胶手环）、试卖后放弃的品类——它们的数据不应再稀释你的达成率。随时取消勾选恢复。</div>
+      </div>
+    </div>
     <div class="sec"><div class="sec-h"><h2>维护</h2></div>
       <div class="panel" style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn" id="btnExport">导出当前数据 JSON</button>
@@ -1085,6 +1138,18 @@ function vData(){
     aEl.download = 'monthly-' + (DB.month||'data') + '.json';
     aEl.click();
   };
+  /* 不做的品类：勾选即存即生效 */
+  $app.querySelectorAll('.exclrow input').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const cn = cb.dataset.cn;
+      if(cb.checked){ if(!EXCL.includes(cn)) EXCL.push(cn); }
+      else EXCL = EXCL.filter(x => x !== cn);
+      _exclDirty = true;
+      saveExcl();
+      vData();
+      toast(cb.checked ? '已排除「' + cn.slice(0, 14) + '」· 全部统计已剔除' : '已恢复「' + cn.slice(0, 14) + '」');
+    });
+  });
   document.getElementById('btnImportJson').onclick = async () => {
     const f = document.getElementById('fJson').files[0];
     if(!f){ toast('请先选择 JSON 文件'); return; }
@@ -1338,20 +1403,20 @@ function vRep(){
   const weeks = [];
   for(let i = 0; i < DB.days.length; i += 7){
     const seg = DB.days.slice(i, i + 7);
-    const rows = DB.rows.filter(r => r[F.d] >= i && r[F.d] < i + seg.length);
+    const rows = actRows().filter(r => r[F.d] >= i && r[F.d] < i + seg.length);
     weeks.push({seg, a: agg(rows)});
   }
-  const all = agg(DB.rows);
+  const all = agg(actRows());
   const tgSum = {u:0,p:0};
   DB.stores.forEach((_, i) => { const t = tgtOf(i); tgSum.u += t.u; tgSum.p += t.p; });
 
   /* 分店铺 × 周 矩阵 */
   const wRows = DB.stores.map((nm, si) => {
     const cells = weeks.map(w => {
-      const rows = DB.rows.filter(r => r[F.st] === si && r[F.d] >= DB.days.indexOf(w.seg[0]) && r[F.d] <= DB.days.indexOf(w.seg[w.seg.length-1]));
+      const rows = actRows().filter(r => r[F.st] === si && r[F.d] >= DB.days.indexOf(w.seg[0]) && r[F.d] <= DB.days.indexOf(w.seg[w.seg.length-1]));
       return agg(rows);
     });
-    return {nm, cells, tot: agg(DB.rows.filter(r => r[F.st] === si))};
+    return {nm, cells, tot: agg(actRows().filter(r => r[F.st] === si))};
   });
 
   $app.innerHTML = `
