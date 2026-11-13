@@ -504,7 +504,7 @@ $app.addEventListener('click', e => {
 $app.addEventListener('change', e => {
   const el = e.target.closest('select[data-nav]');
   if(!el) return;
-  const q = { v: el.dataset.v, st: Number(el.dataset.st) || 0 };
+  const q = { v: el.dataset.v };
   if(el.value !== 'all') q[el.dataset.param] = el.value;
   navTo(q);
 });
@@ -675,27 +675,27 @@ function vOv(){
     ${lvBlock}
     <div class="foot">
       <b>使用说明</b><br>
-      · 点击店铺卡进入店铺层 → 品类 → 父体 → 单品按日明细；「数据管理」可导入新的积加 Excel 或调整月度目标<br>
+      · 六层平级各拆各的维度：总览（大盘）→ 店铺 → 品类 → 父体 → 单品 → 数据（按日明细）；品类/父体/单品/数据均为整店口径，不再重复拆店铺<br>
       · 进度条上的深色竖线 = 月时间进度参照；退款率 8% 为预警线<br>
       · 周报 / 月报文案模板待样例后接入导出（当前「日/周/月报」页提供周期汇总数据）
     </div>`;
   bindCopyAct(actItems);
 }
 
-/* ================= 拆解链路：总览→店铺→品类→父体→单品→数据层面（平级） ================= */
-function levelCrumb(st, cur){
+/* ================= 拆解链路：总览→店铺→品类→父体→单品→数据（平级，各页只拆自己的维度） ================= */
+function levelCrumb(cur){
   const steps = [['ov','总览'],['st','店铺'],['cat','品类'],['pt','父体'],['sku','单品'],['dt','数据']];
   return '<div class="dcrumb">' + steps.map(s => {
     if(s[0] === cur) return `<span class="c on">${s[1]}</span>`;
-    return `<span class="c lit" data-v="${s[0]}"${s[0] === 'ov' ? '' : ` data-st="${st}"`}>${s[1]}</span>`;
+    return `<span class="c lit" data-v="${s[0]}">${s[1]}</span>`;
   }).join('<span class="a">▸</span>') + '</div>';
 }
 function storeTabs(st, v){
   return '<div class="stabs">' + DB.stores.map((nm, i) =>
     `<span class="stab ${i === st ? 'on' : ''}" data-v="${v}" data-st="${i}">${esc(nm)}</span>`).join('') + '</div>';
 }
-function selHtml(st, navV, paramKey, placeholder, opts, cur){
-  return `<select class="sel" data-nav="1" data-v="${navV}" data-st="${st}" data-param="${paramKey}">
+function selHtml(navV, paramKey, placeholder, opts, cur){
+  return `<select class="sel" data-nav="1" data-v="${navV}" data-param="${paramKey}">
     <option value="all">${placeholder}</option>
     ${opts.map(o => `<option value="${o.v}"${String(o.v) === String(cur) ? ' selected' : ''}>${esc(o.lb)}</option>`).join('')}
   </select>`;
@@ -752,7 +752,7 @@ function vStore(st){
       retTopRows = `<div class="sec"><div class="sec-h"><h2>退货 TOP5 单品</h2><span class="hint">退货订单口径 · 点击进入数据页</span></div>
         <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">本月销量</th><th class="r">退货量</th><th class="r">退货/销量</th></tr></thead><tbody>
         ${stRet.map(x => { const ra = agg(actRows().filter(r => r[F.a] === x.ai));
-          return `<tr class="rowbtn" data-v="dt" data-st="${st}" data-a="${x.ai}">
+          return `<tr class="rowbtn" data-v="dt" data-a="${x.ai}">
           <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
           <td class="r">${numStr(ra.u)}</td><td class="r dn">${numStr(x.v)}</td>
           <td class="r ${x.v/Math.max(ra.u,1) > 0.5 ? 'dn' : ''}">${ra.u ? pctStr(x.v/ra.u*100) : '-'}</td></tr>`; }).join('')}
@@ -772,7 +772,7 @@ function vStore(st){
   ]);
 
   $app.innerHTML = `
-    ${levelCrumb(st, 'st')}
+    ${levelCrumb('st')}
     ${storeTabs(st, 'st')}
     <div class="dnote">${nm} · 实际 ${DB.days[0]}~${DB.days[DB.days.length-1]} · 目标指标只考核销量+利润，其他维度辅助总结 · 单品行可进入数据页</div>
     ${conclSt}
@@ -787,53 +787,79 @@ function vStore(st){
     ${retTopRows}
     ${refTop.length ? `<div class="sec"><div class="sec-h"><h2>退款 TOP5 单品</h2><span class="hint">按日表退款量口径 · 点击进入数据页</span></div>
       <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">销量</th><th class="r">退款量</th><th class="r">退款/销量</th></tr></thead><tbody>
-      ${refTop.map(x => `<tr class="rowbtn" data-v="dt" data-st="${st}" data-a="${x.ai}">
+      ${refTop.map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}">
         <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
         <td class="r">${numStr(x.a.u)}</td><td class="r dn">${numStr(x.a.rf)}</td><td class="r">${x.a.u ? pctStr(x.a.rf/x.a.u*100) : '-'}</td></tr>`).join('')}
       </tbody></table></div></div>` : ''}`;
   bindCopyAct(actItemsSt);
 }
 
-/* 品类层 */
-function vCatPage(st){
-  const nm = DB.stores[st];
+/* 品类层：整店口径 · 只拆品类维度（店铺维度在「店铺」页，不在本页重复拆） */
+function vCatPage(){
   $crumbV.textContent = '品类';
-  const rows = actRows().filter(r => r[F.st] === st);
+  const rows = actRows();
   const a = agg(rows);
   const catList = [...groupBy(rows, F.cat).entries()].map(([ci, rs]) => {
-    const a = agg(rs);
+    const aC = agg(rs);
     const asinsC = [...new Set(rs.map(r => r[F.a]))];
     let iv = 0, ktSum = 0, ktN = 0;
     asinsC.forEach(ai => { const sp = sumOf(ai); if(sp){ iv += sp.iv; if(sp.kt > 0){ ktSum += sp.kt; ktN++; } } });
-    return {ci, a, iv, kt: ktN ? ktSum/ktN : 0};
+    return {ci, a: aC, iv, kt: ktN ? ktSum/ktN : 0, n: asinsC.length};
   }).sort((x,y) => y.a.p - x.a.p);
   const maxP = Math.max(...catList.map(x => Math.abs(x.a.p)), 1);
   const worstC = [...catList].sort((x,y) => x.a.p - y.a.p)[0];
   const top3Share = a.s > 0 ? catList.slice(0, 3).reduce((s,x) => s + x.a.s, 0) / a.s * 100 : 0;
+  const lossCats = catList.filter(x => x.a.p < 0);
+  const lossSum = lossCats.reduce((s,x) => s + x.a.p, 0);
+  const totalIv = catList.reduce((s,x) => s + x.iv, 0);
   /* 零销量品类不占版面（合计不受影响，它们销量本就是 0） */
   const zeroCats = catList.filter(x => x.a.u === 0);
   const showCats = catList.filter(x => x.a.u > 0);
   /* 止血结论：最差品类 + 品类内亏损王单品（指名道姓） */
   let stopTxt = '无净亏损品类，按毛利贡献排优先级投放资源。';
   if(worstC && worstC.a.p < 0){
-    const cRows = actRows().filter(r => r[F.st] === st && r[F.cat] === worstC.ci);
-    const worstSku = [...groupBy(cRows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs), st})).sort((x,y) => x.a.p - y.a.p)[0];
+    const cRows = rows.filter(r => r[F.cat] === worstC.ci);
+    const worstSku = [...groupBy(cRows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs)})).sort((x,y) => x.a.p - y.a.p)[0];
     stopTxt = `最差品类【${esc(DB.cats[worstC.ci])}】净亏 <b class="hl">${money(worstC.a.p)}</b> · 滞销占压 ${money(worstC.iv)} —— 主要来自【${esc(DB.names[worstSku.ai].slice(0,18))}】（${DB.asins[worstSku.ai]}，亏 ${money(worstSku.a.p)}）：先停广告，两周无起色清仓。`;
   }
+  /* 头部品类依赖：TOP1 品类的销售额与毛利占比 */
+  const top1 = showCats[0];
+  const gmTop = [...showCats].sort((x,y) => y.a.gm - x.a.gm)[0];
+  const gmLow = [...showCats].sort((x,y) => x.a.gm - y.a.gm)[0];
   const conclCat = conclBox([
-    {k:'集中', tone:'f', txt:`TOP3 品类占本店销售额 <b>${pctStr(top3Share)}</b>${top3Share > 60 ? '，<span class="hl">头部品类的流量与库存波动直接决定大盘，优先保供与稳广告</span>' : '，结构分散度可接受'}。`},
+    {k:'集中', tone:'f', txt:`TOP3 品类占整店销售额 <b>${pctStr(top3Share)}</b>${top3Share > 60 ? '，<span class="hl">头部品类的流量与库存波动直接决定大盘，优先保供与稳广告</span>' : '，结构分散度可接受'}。`},
+    (top1 ? {k:'头部', tone:'f', txt:`头部品类【${esc(DB.cats[top1.ci])}】销售额 ${money(top1.a.s)}（占 <b>${pctStr(top1.a.s/Math.max(a.s,1)*100)}</b>）· 净毛利 ${money(top1.a.p)}（占 ${pctStr(top1.a.p/Math.max(a.p,1)*100)}）${top1.a.s/a.s > 0.4 ? ' —— <span class="hl">单一品类依赖偏高，其断货/差评将直接冲击整店，优先盯库存与评分</span>' : ''}。`} : null),
+    {k:'效率', tone:'f', txt: gmTop && gmLow && gmTop.ci !== gmLow.ci ? `毛利率最高【${esc(DB.cats[gmTop.ci])}】${pctStr(gmTop.a.gm)} vs 最低【${esc(DB.cats[gmLow.ci])}】${pctStr(gmLow.a.gm)} —— 广告预算向高毛利品类倾斜，低毛利品类控投放。` : '品类间毛利率差异不大。'},
     {k:'止血', tone: worstC && worstC.a.p < 0 ? 'r' : 'g', txt: stopTxt}
-  ]);
+  ].filter(Boolean));
+
+  /* 分布图（同口径三张：单品数 / 销售额 / 净毛利率） */
+  const distChart = (title, hint, data, fmt) =>
+    `<div class="panel" style="padding:14px 18px"><div style="font-size:12px;color:var(--sub);margin-bottom:8px">${title}<span style="color:var(--faint)"> · ${hint}</span></div>${hbarRows(data, fmt)}</div>`;
+  const chartGrid = `<div class="sec"><div class="sec-h"><h2>品类分布</h2><span class="hint">仅统计有销量品类 · 整店口径</span></div>
+    <div class="grid3">
+      ${distChart('单品数分布', '结构是否过度集中于单一品类', showCats.map(x => ({lb: DB.cats[x.ci], v: x.n, c:'#8FA4B4'})))}
+      ${distChart('销售额分布', '钱从哪些品类来', showCats.map(x => ({lb: DB.cats[x.ci], v: x.a.s, c:'#1BA3B8', fmt: money})))}
+      ${distChart('净毛利率对比', '高于整店均值 ${pctStr(a.gm)} 为绿色', showCats.map(x => ({lb: DB.cats[x.ci], v: Math.max(x.a.gm, 0), c: x.a.gm >= a.gm ? 'var(--teal)' : 'var(--coral)', fmt: v => pctStr(x.a.gm)})))}
+    </div></div>`;
 
   $app.innerHTML = `
-    ${levelCrumb(st, 'cat')}
-    ${storeTabs(st, 'cat')}
-    <div class="dnote">${nm} · 品类层无单月目标，日均 500+ 件仅作方向参考 · 点击品类行进入父体层</div>
+    ${levelCrumb('cat')}
+    <div class="dnote">整店口径 · 本页只拆<b>品类</b>维度（店铺维度看「店铺」页，父体/单品逐层往下钻） · 点击品类行进入父体层</div>
     ${conclCat}
-    <div class="sec"><div class="sec-h"><h2>品类排行</h2><span class="hint">按净毛利排序 · 滞销/库周转来自汇总快照</span></div>
-      <div class="panel"><table><thead><tr><th>品类</th><th class="r">销量</th><th class="r">日均</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th class="r">滞销货值</th><th class="r">库周转(均)</th><th>毛利贡献</th></tr></thead><tbody>
-      ${showCats.map(x => `<tr class="rowbtn" data-v="pt" data-st="${st}" data-c="${x.ci}">
+    <div class="sec"><div class="sec-h"><h2>品类关键指标</h2><span class="hint">实际 ${DB.days[0]}~${DB.days[DB.days.length-1]}</span></div>
+      <div class="grid4">
+        ${kpiCard('', IC.trend, '有销量品类', `${showCats.length}<small>  / ${catList.length} 个</small>`, `${EXCL.length ? `另有 ${EXCL.length} 个已标记不做已剔除 · ` : ''}零销量 ${zeroCats.length} 个已折叠`)}
+        ${kpiCard(top3Share > 60 ? 'warn' : 'mid', IC.trend, 'TOP3 集中度', pctStr(top3Share), top3Share > 60 ? '头部依赖偏高，优先保供与稳广告' : '结构分散度可接受')}
+        ${kpiCard(lossCats.length ? 'warn' : 'mid', IC.coin, '亏损品类', `${lossCats.length}<small>  个 · 合计 ${money(lossSum)}</small>`, lossCats.length ? `最差【${esc(worstC ? DB.cats[worstC.ci] : '')}】${worstC ? money(worstC.a.p) : ''} · 处置见结论` : '无净亏损品类')}
+        ${kpiCard(totalIv > 0 ? 'warn' : 'mid', IC.pct, '滞销占压', money(totalIv), '全部品类滞销货值合计（汇总快照）')}
+      </div></div>
+    ${chartGrid}
+    <div class="sec"><div class="sec-h"><h2>品类排行</h2><span class="hint">按净毛利排序 · 滞销/库周转来自汇总快照 · 点击进入父体层</span></div>
+      <div class="panel"><table><thead><tr><th>品类</th><th class="r">单品数</th><th class="r">销量</th><th class="r">日均</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th class="r">滞销货值</th><th class="r">库周转(均)</th><th>毛利贡献</th></tr></thead><tbody>
+      ${showCats.map(x => `<tr class="rowbtn" data-v="pt" data-c="${x.ci}">
         <td class="tname">${esc(DB.cats[x.ci])}</td>
+        <td class="r">${x.n}</td>
         <td class="r">${numStr(x.a.u)}</td>
         <td class="r">${numStr(x.a.u/DB.days.length)}</td>
         <td class="r">${money(x.a.s)}</td>
@@ -842,23 +868,23 @@ function vCatPage(st){
         <td class="r">${money(x.iv)}</td>
         <td class="r ${x.kt > 100 ? 'dn' : ''}">${x.kt ? numStr(x.kt) + ' 天' : '-'}</td>
         <td>${barCell(x.a.p, maxP)}</td></tr>`).join('')}
-      <tr class="tot"><td class="tname">合计</td><td class="r">${numStr(a.u)}</td><td class="r">${numStr(a.u/DB.days.length)}</td><td class="r">${money(a.s)}</td><td class="r ${a.p>=0?'up':'dn'}">${money(a.p)}</td><td class="r gm ${gmCls(a.gm)}">${pctStr(a.gm)}</td><td class="r">${money(catList.reduce((s,x) => s+x.iv, 0))}</td><td class="r">-</td><td></td></tr>
+      <tr class="tot"><td class="tname">合计</td><td class="r">${catList.reduce((s,x) => s+x.n, 0)}</td><td class="r">${numStr(a.u)}</td><td class="r">${numStr(a.u/DB.days.length)}</td><td class="r">${money(a.s)}</td><td class="r ${a.p>=0?'up':'dn'}">${money(a.p)}</td><td class="r gm ${gmCls(a.gm)}">${pctStr(a.gm)}</td><td class="r">${money(totalIv)}</td><td class="r">-</td><td></td></tr>
       </tbody></table>
       ${zeroCats.length ? `<div class="dnote" style="margin-top:8px">已折叠 ${zeroCats.length} 个零销量品类（${zeroCats.slice(0,4).map(x => esc(DB.cats[x.ci])).join('、')}${zeroCats.length > 4 ? ' 等' : ''}）——不产生销量与利润，只积压库存；需要清仓的看滞销货值列或数据管理页。</div>` : ''}
       ${EXCL.length ? `<div class="dnote" style="margin-top:6px">另有 <b>${EXCL.length}</b> 个品类已标记「不做」并从全部统计中剔除（数据管理页可恢复）。</div>` : ''}
       </div></div>`;
 }
 
-/* 父体层 */
-function vParentPage(st, c){
+/* 父体层：整店口径 · 品类筛选用于从品类往下钻 */
+function vParentPage(c){
   $crumbV.textContent = '父体';
-  const storeRows = actRows().filter(r => r[F.st] === st);
-  let rows = storeRows, catSel = 'all';
+  const allRows = actRows();
+  let rows = allRows, catSel = 'all';
   if(c !== undefined && c !== '' && DB.cats[Number(c)] !== undefined){
-    rows = storeRows.filter(r => r[F.cat] === Number(c));
+    rows = allRows.filter(r => r[F.cat] === Number(c));
     catSel = Number(c);
   }
-  const catOpts = [...groupBy(storeRows, F.cat).entries()].map(([ci, rs]) => ({ci, p: agg(rs).p, u: agg(rs).u}))
+  const catOpts = [...groupBy(allRows, F.cat).entries()].map(([ci, rs]) => ({ci, p: agg(rs).p, u: agg(rs).u}))
     .sort((x, y) => y.p - x.p).map(o => ({v: o.ci, lb: DB.cats[o.ci] + '（' + numStr(o.u) + ' 件）'}));
   const pars = [...groupBy(rows, F.pa).entries()].map(([pi, rs]) => {
     const pa = agg(rs);
@@ -872,29 +898,28 @@ function vParentPage(st, c){
   let stopTxtP = '无净亏损父体。';
   if(worstP && worstP.pa.p < 0){
     const pRows = rows.filter(r => r[F.pa] === worstP.pi);
-    const worstSku = [...groupBy(pRows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs), st})).sort((x,y) => x.a.p - y.a.p)[0];
+    const worstSku = [...groupBy(pRows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs)})).sort((x,y) => x.a.p - y.a.p)[0];
     let cause = `净毛利率 ${pctStr(worstSku.a.gm)}`;
     if(worstSku.a.rf > worstSku.a.u) cause = `退款 ${numStr(worstSku.a.rf)} 件 = 销量 ${(worstSku.a.rf/Math.max(worstSku.a.u,1)).toFixed(1)} 倍`;
     else if(worstSku.a.s && worstSku.a.ad/worstSku.a.s > 0.35) cause = `广告占销售额 ${pctStr(worstSku.a.ad/worstSku.a.s*100)}`;
     stopTxtP = `亏损最重的父体【${esc(repNameOf(rows, worstP.pi).slice(0, 18))}】净亏 <b class="hl">${money(worstP.pa.p)}</b> —— 内部亏损王【${esc(DB.names[worstSku.ai].slice(0,16))}】（${DB.asins[worstSku.ai]}，${cause}）：停广告→核成本→仍亏则清仓。`;
   }
   const conclPt = conclBox([
-    {k:'集中', tone:'f', txt:`TOP5 父体占${catSel !== 'all' ? '该品类' : '本店'}销售额 <b>${pctStr(top5Share)}</b>${top5Share > 50 ? '，<span class="hl">主力依赖偏高，任一主力断货即影响大盘，优先盯库存</span>' : ''}。`},
+    {k:'集中', tone:'f', txt:`TOP5 父体占${catSel !== 'all' ? '该品类' : '整店'}销售额 <b>${pctStr(top5Share)}</b>${top5Share > 50 ? '，<span class="hl">主力依赖偏高，任一主力断货即影响大盘，优先盯库存</span>' : ''}。`},
     {k:'止血', tone: worstP && worstP.pa.p < 0 ? 'r' : 'g', txt: stopTxtP}
   ]);
 
   $app.innerHTML = `
-    ${levelCrumb(st, 'pt')}
-    ${storeTabs(st, 'pt')}
+    ${levelCrumb('pt')}
     <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
       <span style="font-size:12px;color:var(--sub)">品类筛选</span>
-      ${selHtml(st, 'pt', 'c', '全部品类', catOpts, catSel)}
+      ${selHtml('pt', 'c', '全部品类', catOpts, catSel)}
     </div>
     ${conclPt}
-    <div class="dnote" style="margin-top:8px">父产品名称为"-"的按 父ASIN→ASIN 兜底归组 · 点击父体行进入单品层</div>
+    <div class="dnote" style="margin-top:8px">整店口径${catSel !== 'all' ? ' · 已筛选品类【' + esc(DB.cats[catSel]) + '】' : ''} · 父产品名称为"-"的按 父ASIN→ASIN 兜底归组 · 点击父体行进入单品层</div>
     <div class="sec"><div class="sec-h"><h2>父体排行</h2><span class="hint">按净毛利排序 · 共 ${pars.length} 个父体</span></div>
       <div class="panel"><table><thead><tr><th>父体（代表单品）</th><th>父ASIN</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
-      ${pars.map(x => `<tr class="rowbtn" data-v="sku" data-st="${st}" data-pa="${x.pi}">
+      ${pars.map(x => `<tr class="rowbtn" data-v="sku" data-pa="${x.pi}">
         <td class="tname">${esc(x.rep)}</td><td class="asin">${esc(DB.parents[x.pi])}</td>
         <td class="r">${numStr(x.pa.u)}</td><td class="r">${money(x.pa.s)}</td>
         <td class="r ${x.pa.p>=0?'up':'dn'}">${money(x.pa.p)}</td>
@@ -903,33 +928,40 @@ function vParentPage(st, c){
       </tbody></table></div></div>`;
 }
 
-/* 单品层 */
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function vSkuPage(st, pa){
+
+/* 单品层：整店口径 · 父体筛选用于从父体往下钻 */
+function vSkuPage(pa){
   $crumbV.textContent = '单品';
-  const storeRows = actRows().filter(r => r[F.st] === st);
-  let rows = storeRows, paSel = 'all';
+  const allRows = actRows();
+  let rows = allRows, paSel = 'all';
   if(pa !== undefined && pa !== '' && DB.parents[Number(pa)] !== undefined){
-    rows = storeRows.filter(r => r[F.pa] === Number(pa));
+    rows = allRows.filter(r => r[F.pa] === Number(pa));
     paSel = Number(pa);
   }
-  const paOpts = [...groupBy(storeRows, F.pa).entries()].map(([pi, rs]) => ({pi, p: agg(rs).p}))
+  const paOpts = [...groupBy(allRows, F.pa).entries()].map(([pi, rs]) => ({pi, p: agg(rs).p}))
     .sort((x, y) => y.p - x.p)
-    .map(o => ({v: o.pi, lb: repNameOf(storeRows, o.pi).slice(0, 22) + ' · ' + DB.parents[o.pi]}));
+    .map(o => ({v: o.pi, lb: repNameOf(allRows, o.pi).slice(0, 22) + ' · ' + DB.parents[o.pi]}));
   const skus = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
   const maxP = Math.max(...skus.map(x => Math.abs(x.a.p)), 1);
+  const worstSku = skus[skus.length - 1];
+  const conclSku = conclBox([
+    {k:'止血', tone: worstSku && worstSku.a.p < 0 ? 'r' : 'g', txt: worstSku && worstSku.a.p < 0
+      ? `亏损最重的单品【${esc(DB.names[worstSku.ai].slice(0,18))}】（${DB.asins[worstSku.ai]}）净亏 <b class="hl">${money(worstSku.a.p)}</b> · 毛利率 ${pctStr(worstSku.a.gm)} —— 优先处置（停广告→核成本→清仓）。`
+      : '当前筛选范围无净亏损单品。'}
+  ]);
 
   $app.innerHTML = `
-    ${levelCrumb(st, 'sku')}
-    ${storeTabs(st, 'sku')}
+    ${levelCrumb('sku')}
     <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
       <span style="font-size:12px;color:var(--sub)">父体筛选</span>
-      ${selHtml(st, 'sku', 'pa', '全部父体', paOpts, paSel)}
+      ${selHtml('sku', 'pa', '全部父体', paOpts, paSel)}
     </div>
-    <div class="dnote" style="margin-top:8px">共 ${skus.length} 个单品 · 点击单品行进入数据页（按日明细逐字段）</div>
+    ${conclSku}
+    <div class="dnote" style="margin-top:8px">整店口径 · 共 ${skus.length} 个单品 · 点击单品行进入数据页（按日明细逐字段）</div>
     <div class="sec"><div class="sec-h"><h2>单品排行</h2><span class="hint">按净毛利排序</span></div>
       <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
-      ${skus.map(x => `<tr class="rowbtn" data-v="dt" data-st="${st}" data-a="${x.ai}">
+      ${skus.map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}">
         <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
         <td class="r">${numStr(x.a.u)}</td><td class="r">${money(x.a.s)}</td>
         <td class="r ${x.a.p>=0?'up':'dn'}">${money(x.a.p)}</td>
@@ -938,16 +970,16 @@ function vSkuPage(st, pa){
       </tbody></table></div></div>`;
 }
 
-/* 数据层面：单 ASIN 按日明细逐字段 */
-function vDetail(st, a){
+/* 数据层面：单 ASIN 按日明细逐字段（整店口径） */
+function vDetail(a){
   $crumbV.textContent = '数据';
-  const storeRows = actRows().filter(r => r[F.st] === st);
-  const ranked = [...groupBy(storeRows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
-  if(a === undefined || a === '' || DB.asins[Number(a)] === undefined || !storeRows.some(r => r[F.a] === Number(a))){
+  const allRows = actRows();
+  const ranked = [...groupBy(allRows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
+  if(a === undefined || a === '' || DB.asins[Number(a)] === undefined || !allRows.some(r => r[F.a] === Number(a))){
     a = ranked.length ? ranked[0].ai : null;
   } else a = Number(a);
   if(a === null){
-    $app.innerHTML = levelCrumb(st,'dt') + storeTabs(st,'dt') + '<div class="panel">该店铺无数据</div>';
+    $app.innerHTML = levelCrumb('dt') + '<div class="panel">无数据</div>';
     return;
   }
   const rows = DB.rows.filter(r => r[F.a] === a).sort((x,y) => x[F.d] - y[F.d]);
@@ -977,11 +1009,10 @@ function vDetail(st, a){
     </div>` : '';
 
   $app.innerHTML = `
-    ${levelCrumb(st, 'dt')}
-    ${storeTabs(st, 'dt')}
+    ${levelCrumb('dt')}
     <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
       <span style="font-size:12px;color:var(--sub)">选择单品</span>
-      ${selHtml(st, 'dt', 'a', '选择单品', ranked.map(x => ({v: x.ai, lb: DB.asins[x.ai] + ' · ' + DB.names[x.ai].slice(0, 24)})), a)}
+      ${selHtml('dt', 'a', '选择单品', ranked.map(x => ({v: x.ai, lb: DB.asins[x.ai] + ' · ' + DB.names[x.ai].slice(0, 24)})), a)}
     </div>
     <div class="dnote" style="margin-top:8px"><b>${esc(DB.names[a])}</b> · ${asin} · 按日明细（销量 / 毛利 / 广告 / 费用逐字段）</div>
     <div class="sec"><div class="grid4">
@@ -1462,11 +1493,12 @@ function vRep(){
 function render(){
   const q = parseHash();
   const v = q.v || 'ov';
+  /* 店铺维度只在「店铺」页；品类/父体/单品/数据均为整店口径，只拆自己的维度 */
   if(v === 'st') vStore(Number(q.st) || 0);
-  else if(v === 'cat') vCatPage(Number(q.st) || 0);
-  else if(v === 'pt') vParentPage(Number(q.st) || 0, q.c);
-  else if(v === 'sku') vSkuPage(Number(q.st) || 0, q.pa);
-  else if(v === 'dt') vDetail(Number(q.st) || 0, q.a);
+  else if(v === 'cat') vCatPage();
+  else if(v === 'pt') vParentPage(q.c);
+  else if(v === 'sku') vSkuPage(q.pa);
+  else if(v === 'dt') vDetail(q.a);
   else if(v === 'data') vData();
   else if(v === 'rep') vRep();
   else vOv();
