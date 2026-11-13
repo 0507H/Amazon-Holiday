@@ -29,6 +29,8 @@ html.embedded .side{display:none}
 .s-row{color:#D8E6F0;font-size:13px;padding:9px 16px;cursor:pointer;border-left:3px solid transparent}
 .s-row:hover{background:rgba(255,255,255,.06)}
 .s-row.on{background:rgba(27,163,184,.22);border-left-color:var(--teal);color:#fff;font-weight:600}
+.s-lbl{font-size:10.5px;color:#7C93A6;letter-spacing:1.5px;padding:12px 16px 3px;font-weight:600}
+.s-row.sub{padding-left:30px;font-size:12.5px;color:#BCD0DE}
 .s-foot{margin-top:26px;color:#6E8CA3;font-size:11px;padding:0 16px;line-height:1.8}
 .main{flex:1;min-width:0}
 .wrap{max-width:1280px;margin:0 auto;padding:0 24px 48px}
@@ -200,6 +202,19 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
 .chipstat span b{color:var(--ink)}
 .chipstat span.warn{background:#FBEDEA;color:var(--coral)}
 .chipstat span.ok{background:#E9F5EE;color:var(--green)}
+/* 红黄绿灯 */
+.lamp{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;border-radius:6px;padding:2px 8px;vertical-align:middle}
+.lamp::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor}
+.lamp.g{background:#E9F5EE;color:#2E9E6B}
+.lamp.y{background:#FDF4E3;color:#C98A1B}
+.lamp.w{background:#FBEDEA;color:#B8423A}
+/* 散点四象限 */
+.scatter{width:100%;max-width:640px;display:block;margin:0 auto}
+/* 行动跟进 */
+.stsel{font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:#fff;color:var(--sub)}
+.todochk{width:15px;height:15px;vertical-align:-3px;cursor:pointer}
+tr.actdone td{opacity:.45;text-decoration:line-through}
+tr.actdone td .stsel, tr.actdone td .lamp{text-decoration:none;opacity:1}
 </style>
 </head>
 <body>
@@ -209,14 +224,21 @@ tr.tot td{background:#F6F9FC;font-weight:700;border-top:2px solid var(--line)}
     <div><div class="nm">脆脆鲨</div><div class="sub">月度跟进</div></div>
   </div>
   <nav>
-    <div class="s-row" data-v="ov">总览</div>
-    <div class="s-row" data-v="st">店铺</div>
-    <div class="s-row" data-v="cat">品类</div>
-    <div class="s-row" data-v="pt">父体</div>
-    <div class="s-row" data-v="sku">单品</div>
-    <div class="s-row" data-v="dt">数据</div>
-    <div class="s-row" data-v="rep">日/周/月报</div>
-    <div class="s-row" data-v="data">数据管理</div>
+    <div class="s-row" data-v="ov">01 总览驾驶舱</div>
+    <div class="s-row" data-v="gap">02 目标与差异</div>
+    <div class="s-lbl">03 经营下钻</div>
+    <div class="s-row sub" data-v="st">店铺对比</div>
+    <div class="s-row sub" data-v="cat">品类主题</div>
+    <div class="s-row sub" data-v="pt">父体</div>
+    <div class="s-row sub" data-v="sku">单品分层</div>
+    <div class="s-lbl">04 专题监控</div>
+    <div class="s-row sub" data-v="tf">流量转化</div>
+    <div class="s-row sub" data-v="adw">广告</div>
+    <div class="s-row sub" data-v="inv">库存</div>
+    <div class="s-row sub" data-v="rc">价格与售后</div>
+    <div class="s-row" data-v="act">05 行动跟进</div>
+    <div class="s-row" data-v="rep">06 日/周/月报</div>
+    <div class="s-row" data-v="data">07 数据管理</div>
   </nav>
   <div class="s-foot">单文件自包含<br>可离线 · 可分享</div>
 </aside>
@@ -273,8 +295,23 @@ function groupBy(rows, keyIdx){
 }
 /* 行字段索引 */
 const F = {d:0,st:1,cat:2,pa:3,a:4,u:5,s:6,p:7,rf:8,ad:9,ads:10,rev:11,exp:12,pur:13,fba:14,comm:15,cpn:16,ord:17,ses:18};
+/* ================= 阈值配置（红黄绿灯，数据管理页可改，每季度用滚动数据复核） ================= */
+const TH_DEF = {cvrG:8, cvrY:5, tacosG:10, tacosY:15, refundG:8, sdMin:45, sdMax:75, idlePct:15, depN:80, sesN:50, minU:10};
+const LS_THR = 'lfh_monthly_thr';
+let THR = (function(){ try{ const r = localStorage.getItem(LS_THR); if(r){ const o = JSON.parse(r); if(o && typeof o === 'object') return Object.assign({}, TH_DEF, o); } }catch(e){} return Object.assign({}, TH_DEF); })();
+function saveThr(){ try{ localStorage.setItem(LS_THR, JSON.stringify(THR)); return true; }catch(e){ return false; } }
+/* 灯判定：g=绿(健康) y=黄 w=红 */
+function lamp(v, gAt, yAt, dir){ /* dir=1 越大越好，dir=-1 越小越好 */
+  const ok = dir === -1 ? v <= gAt : v >= gAt;
+  const mid = dir === -1 ? v <= yAt : v >= yAt;
+  return ok ? 'g' : (mid ? 'y' : 'w');
+}
+const LAMP_UI = {
+  g:'<span class="lamp g">绿</span>', y:'<span class="lamp y">黄</span>', w:'<span class="lamp w">红</span>'
+};
+function lampHtml(s, lb){ return `<span class="lamp ${s}">${lb || (s === 'g' ? '绿灯' : s === 'y' ? '黄灯' : '红灯')}</span>`; }
 /* 微量行：月销量 < 10 件不占排行版面——小样本下净毛利与毛利率严重失真（卖1件就可能 ±120%），没有统计意义 */
-const MIN_U = 10;
+let MIN_U = THR.minU;
 
 /* ================= 格式化 ================= */
 function money(v, dec){
@@ -476,6 +513,36 @@ function svgLine(vals, color){
 }
 function dayLabels(){ return [DB.days[0].slice(5), DB.days[Math.floor(DB.days.length/2)].slice(5), DB.days[DB.days.length-1].slice(5)]; }
 
+/* 四象限散点：x=月内增速% y=净利率% r=销售额 */
+function svgScatter(pts, o){
+  o = o || {};
+  const W = 340, H = 280, PAD = 34;
+  let xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  let xLo = Math.min(-40, ...xs), xHi = Math.max(40, ...xs);
+  let yLo = Math.min(-25, ...ys), yHi = Math.max(25, ...ys);
+  const x = v => PAD + (v - xLo)/(xHi - xLo || 1)*(W - PAD - 8);
+  const y = v => H - PAD - (v - yLo)/(yHi - yLo || 1)*(H - PAD*2);
+  const X0 = x(0), Y0 = y(o.yLine === undefined ? 8 : o.yLine);
+  let out = `<rect x="${PAD}" y="${PAD/2}" width="${W-PAD-8}" height="${H-PAD}" fill="#FBFCFD" stroke="var(--line)"/>`;
+  /* 象限底色 */
+  out += `<rect x="${X0}" y="${PAD/2}" width="${Math.max(0,W-8-X0)}" height="${Y0-PAD/2}" fill="#E9F5EE" opacity=".5"/>`;
+  out += `<rect x="${X0}" y="${Y0}" width="${Math.max(0,W-8-X0)}" height="${H-PAD-Y0}" fill="#FBEDEA" opacity=".5"/>`;
+  out += `<line x1="${X0}" y1="${PAD/2}" x2="${X0}" y2="${H-PAD}" stroke="#B9C9D6" stroke-dasharray="4 3"/>`;
+  out += `<line x1="${PAD}" y1="${Y0}" x2="${W-8}" y2="${Y0}" stroke="#B9C9D6" stroke-dasharray="4 3"/>`;
+  out += `<text x="${W-14}" y="${PAD/2+14}" text-anchor="end" font-size="11" fill="#2E9E6B" font-weight="600">${o.q1 || '明星'}</text>`;
+  out += `<text x="${PAD+6}" y="${PAD/2+14}" font-size="11" fill="#8FA4B4" font-weight="600">${o.q2 || '现金牛'}</text>`;
+  out += `<text x="${W-14}" y="${H-PAD-6}" text-anchor="end" font-size="11" fill="#B8423A" font-weight="600">${o.q4 || '瘦狗·退出'}</text>`;
+  out += `<text x="${PAD+6}" y="${H-PAD-6}" font-size="11" fill="#C98A1B" font-weight="600">${o.q3 || '问题·诊断'}</text>`;
+  out += `<text x="${W/2}" y="${H-8}" text-anchor="middle" font-size="10.5" fill="#5E7586">月内销量增速（近7日 vs 此前日均）→</text>`;
+  out += `<text x="12" y="${H/2}" font-size="10.5" fill="#5E7586" transform="rotate(-90 12 ${H/2})" text-anchor="middle">净利率 %</text>`;
+  pts.forEach(p => {
+    const r = Math.max(3, Math.min(16, Math.sqrt(Math.max(p.r, 0))/o.rMax*14 + 3));
+    out += `<circle cx="${x(p.x).toFixed(1)}" cy="${y(p.y).toFixed(1)}" r="${r.toFixed(1)}" fill="${p.c}" opacity=".72" stroke="#fff" stroke-width="1"><title>${p.lb}｜增速 ${p.x.toFixed(1)}%｜净利率 ${p.y.toFixed(1)}%｜销售额 $${Math.round(p.r)}</title></circle>`;
+    if(p.big) out += `<text x="${x(p.x).toFixed(1)}" y="${(y(p.y)-r-3).toFixed(1)}" text-anchor="middle" font-size="10" fill="#1C2B36">${esc(p.lb.slice(0,10))}</text>`;
+  });
+  return `<svg class="scatter" viewBox="0 0 ${W} ${H}">${out}</svg>`;
+}
+
 /* ================= 路由 ================= */
 const $app = document.getElementById('app');
 const $crumbV = document.getElementById('crumbV');
@@ -490,6 +557,7 @@ function navTo(q){
   if(q.c !== undefined) h += '&c=' + q.c;
   if(q.pa !== undefined) h += '&pa=' + q.pa;
   if(q.a !== undefined) h += '&a=' + q.a;
+  if(q.ly !== undefined) h += '&ly=' + q.ly;
   location.hash = h;
 }
 $app.addEventListener('click', e => {
@@ -519,7 +587,8 @@ document.getElementById('sideNav').addEventListener('click', e => {
 });
 function syncSide(v, q){
   document.querySelectorAll('#sideNav .s-row').forEach(r => r.classList.remove('on'));
-  const map = {ov:'ov', st:'st', cat:'cat', pt:'pt', sku:'sku', dt:'dt', rep:'rep', data:'data'};
+  /* dt 是单品钻取详情页，归到「单品分层」菜单 */
+  const map = {ov:'ov', gap:'gap', st:'st', cat:'cat', pt:'pt', sku:'sku', tf:'tf', adw:'adw', inv:'inv', rc:'rc', act:'act', rep:'rep', data:'data', dt:'sku'};
   const sel = map[v] ? `#sideNav .s-row[data-v="${map[v]}"]` : null;
   if(sel){ const el = document.querySelector(sel); if(el) el.classList.add('on'); }
 }
@@ -581,78 +650,30 @@ function chartCard(title, valueStr, svg){
   return `<div class="chart-card"><div class="ct"><span>${title}</span><b>${valueStr}</b></div>${svg}<div class="xl"><span>${dayLabels()[0]}</span><span>${dayLabels()[1]}</span><span>${dayLabels()[2]}</span></div></div>`;
 }
 
-/* ================= 视图：总览 ================= */
+/* ================= 视图：01 总览驾驶舱（结论先行 · 指标后行） ================= */
 function vOv(){
-  $crumbV.textContent = '总览';
+  $crumbV.textContent = '总览驾驶舱';
   const all = agg(actRows());
-  const tgSum = {u:0,p:0,g:0};
+  const tgSum = {u:0, p:0};
   DB.stores.forEach((_, i) => { const t = tgtOf(i); tgSum.u += t.u; tgSum.p += t.p; });
   const tp = timeProg();
   const srcNote = DB.days.length + '/' + (DB.monthDays||30) + ' 天';
-
-  const storeCards = DB.stores.map((nm, i) => {
-    const rows = actRows().filter(r => r[F.st] === i);
-    const a = agg(rows), t = tgtOf(i);
-    const uRate = t.u ? a.u/t.u*100 : 0;
-    const pRate = t.p ? a.p/t.p*100 : 0;
-    const left = (DB.monthDays||30) - DB.days.length;
-    const uNeed = left > 0 && t.u ? Math.ceil(Math.max(0, t.u - a.u)/left) : null;
-    const perDay = a.u / DB.days.length;
-    const refRate = a.s ? a.rf/a.s*100 : 0;
-    const hs = healthState(a, t);
-    const badge = `<span class="badge ${hs.s==='danger'?'red':(hs.s==='ok'?'tl':'amb')}">${hs.lb}</span>`;
-    const ft = a.rf/a.u > 1 ? `<span class="refwarn">⚠ 退款 ${numStr(a.rf)} 件 = 销量 ${(a.rf/Math.max(a.u,1)).toFixed(1)} 倍</span>` : `<span>销售额 ${money(a.s)} · 退款 ${numStr(a.rf)}</span>`;
-    return `<div class="store" data-v="st" data-st="${i}">
-      <div class="store-h"><span class="nm">${nm}</span>${badge}</div>
-      <div class="tg-row"><span>目标销量 <b>${numStr(t.u)}</b></span><span>目标利润 <b>${money(t.p)}</b></span><span>毛利率 <b>${t.g}%</b></span></div>
-      <div class="mrow"><span class="k">销量</span><span class="v">${numStr(a.u)} <small style="color:var(--faint)">/ ${numStr(t.u)}</small></span></div>
-      <div class="pb-lb"><b class="${rateCls(uRate)}">${pctStr(uRate)}</b><span>${uNeed ? `剩余${left}天需日均 ${numStr(uNeed)}（当前 ${numStr(perDay)}）` : ''}</span></div>
-      <div class="bar"><div class="fill ${uRate<8?'dnb':''}" style="width:${Math.min(100,Math.max(0,uRate))}%"></div><div class="mark" data-lb="${pctStr(tp)}" style="left:${Math.min(95,tp)}%"></div></div>
-      <div class="mrow" style="margin-top:12px"><span class="k">净毛利</span><span class="v ${a.p>=0?'up':'dn'}">${money(a.p)}</span></div>
-      <div class="pb-lb"><b class="${a.p>=0?'up':'dn'}">${pctStr(pRate)}</b><span>净毛利率 ${pctStr(a.gm)} / 目标 ${t.g}%</span></div>
-      <div class="bar"><div class="fill ${pRate<8?'dnb':''}" style="width:${Math.min(100,Math.max(0,pRate))}%"></div><div class="mark" data-lb="${pctStr(tp)}" style="left:${Math.min(95,tp)}%"></div></div>
-      <div class="store-ft">${ft}<span class="go">钻取 →</span></div>
-    </div>`;
-  }).join('');
-
-  /* ===== 分析结论与影响金额 ===== */
-  const imp = impactOf(undefined);
-  const skuAgg = [...groupBy(actRows(), F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs)}));
   const uRateAll = tgSum.u ? all.u/tgSum.u*100 : 0;
   const pRateAll = tgSum.p ? all.p/tgSum.p*100 : 0;
+  const cvr = all.ses ? all.ord/all.ses*100 : 0;
+  const tacos = all.s ? all.ad/all.s*100 : 0;
   const left = (DB.monthDays||30) - DB.days.length;
   const uNeedAll = left > 0 && tgSum.u ? Math.ceil(Math.max(0, tgSum.u - all.u)/left) : null;
 
-  /* 级别利润率对比 */
-  const lvMap = {};
-  skuAgg.forEach(({ai, a}) => {
-    const sp = sumOf(ai);
-    const lvName = sp ? (DB.lvs[sp.lv] || '未评级') : '未评级';
-    const m = lvMap[lvName] || (lvMap[lvName] = {s:0, p:0, n:0});
-    m.s += a.s; m.p += a.p; m.n++;
-  });
-  const lvList = Object.keys(lvMap).map(k => ({lb: k, v: lvMap[k].s ? lvMap[k].p/lvMap[k].s*100 : 0, n: lvMap[k].n, c: lvMap[k].p >= 0 ? 'var(--teal)' : 'var(--coral)'}))
-    .filter(x => x.n >= 3).sort((x,y) => y.v - x.v).map(x => ({lb: `${x.lb}（${x.n}品）`, v: x.v, c: x.c, fmt: v => pctStr(v)}));
-
   const actItems = actionEngine(actRows());
-  const top3 = actItems.slice(0, 3);
+  const top5 = actItems.slice(0, 5);
   const conclOv = conclBox([
     {k:'大盘', tone: all.p < 0 ? 'r' : (pRateAll >= tp && uRateAll >= tp ? 'g' : 'o'), txt:`利润达成 <b class="${pRateAll>=tp?'hg':'hl'}">${pctStr(pRateAll)}</b> / 销量达成 <b class="${uRateAll>=tp?'hg':'hl'}">${pctStr(uRateAll)}</b>（时间进度 ${pctStr(tp)}）。` +
       (uNeedAll ? `剩余 <b>${left}</b> 天需日均 <b class="${uRateAll>=tp?'hg':'hl'}">${numStr(uNeedAll)}</b> 件（当前 ${numStr(all.u/DB.days.length)} 件/天）。` : '')},
-    (top3.length ? {k:'本周先做', tone:'r', txt: top3.map((x,i) =>
+    (top5.length ? {k:'P0', tone:'r', txt: top5.slice(0, 3).map((x,i) =>
       `<b>${['一','二','三'][i]}</b>：【${x.best.t}】<span class="hl">${esc(x.nm.slice(0,16))}</span>（${x.asin}）${x.best.act}，涉及 <b>${money(x.best.amt)}</b>`).join('；') +
-      `。完整清单与依据见下方行动清单。`} : {k:'行动', tone:'g', txt:'当前无触发行动规则的问题单品，按计划推进。'})
+      `。完整分级清单见「05 行动跟进」。`} : {k:'行动', tone:'g', txt:'当前无触发行动规则的问题单品，按计划推进。'})
   ]);
-
-  const impCards = `<div class="sec"><div class="sec-h"><h2>影响金额（钱在哪里出问题）</h2><span class="hint">口径见各卡说明 · 所有可行动问题按金额排序</span></div><div class="grid4">
-    ${kpiCard(imp.lossAmt < 0 ? 'warn' : 'mid', IC.coin, '亏损缺口（可回收上界）', `<span class="dn">${money(imp.lossAmt)}</span><small>  ${imp.lossN} 个亏损单品</small>`, '亏损单品净毛利合计 · 处置路径：停投→提价→清仓')}
-    ${kpiCard(imp.oosN ? 'warn' : 'mid', IC.trend, '断货损失估算', money(imp.oosLoss), `${imp.oosN} 个断货品（有销量无库存）· 净利日均 × 14 天补货周期`)}
-    ${kpiCard('mid', IC.pct, '滞销占压', money(imp.idle), '滞销货值合计（汇总快照）· 365天+ 直接清仓')}
-    ${kpiCard(imp.refAmt > 0 ? 'warn' : 'mid', IC.refund, '退货损失近似', money(imp.refAmt), `退货 ${numStr(imp.refN)} 件 × 售价（上界）· 原因与状态见店铺层`)}
-  </div></div>`;
-
-  const lvBlock = lvList.length ? `<div class="sec"><div class="sec-h"><h2>运营级别利润率对比</h2><span class="hint">级别与利润是否倒挂 · 倒挂品可申请复评升级</span></div>
-    <div class="panel" style="padding:14px 18px">${hbarRows(lvList)}</div></div>` : '';
 
   $app.innerHTML = `
     <div class="src">
@@ -664,24 +685,30 @@ function vOv(){
       <div class="pace">月时间进度<b>${pctStr(tp)}<i>（${DB.days.length}/${DB.monthDays||30} 天）</i></b></div>
     </div>
     <div class="sec">
-      <div class="sec-h"><h2>整体目标达成</h2><span class="hint">实际数据 ${DB.days[0]}~${DB.days[DB.days.length-1]} · 目标即本月考核目标</span></div>
-      <div class="grid4">${rateKpis(all, {u:tgSum.u, p:tgSum.p, g:0}, '整体')}</div>
+      <div class="sec-h"><h2>四灯盘 · 绿/黄/红</h2><span class="hint">阈值在「07 数据管理 · 阈值配置」维护 · 差多少为什么差进「02 目标与差异」</span></div>
+      <div class="grid4">
+        ${kpiCard(uRateAll>=tp?'':'mid', IC.trend, '销量达成', `<span class="${uRateAll>=tp?'up':'dn'}">${pctStr(uRateAll)}</span>`, tgSum.u ? `实际 ${numStr(all.u)} / 目标 ${numStr(tgSum.u)} · 时间进度 ${pctStr(tp)}` : '目标未录入（数据管理页）')}
+        ${kpiCard(pRateAll>=tp?'':'mid', IC.coin, '利润达成', `<span class="${all.p>=0?'up':'dn'}">${pctStr(pRateAll)}</span>`, tgSum.p ? `实际 ${money(all.p)} / 目标 ${money(tgSum.p)} · 净毛利 ${pctStr(all.gm)}` : '目标未录入（数据管理页）')}
+        ${kpiCard(cvr >= THR.cvrG ? '' : (cvr >= THR.cvrY ? 'mid' : 'warn'), IC.pct, 'CVR', `<span class="${cvr>=THR.cvrG?'up':'dn'}">${pctStr(cvr)}</span>`, `订单 ${numStr(all.ord)} / Sessions ${numStr(all.ses)} · 绿 ≥${THR.cvrG}%`)}
+        ${kpiCard(tacos <= THR.tacosG ? '' : (tacos <= THR.tacosY ? 'mid' : 'warn'), IC.coin, 'TACOS', `<span class="${tacos<=THR.tacosG?'up':'dn'}">${pctStr(tacos)}</span>`, `广告 ${money(all.ad)} ÷ 销售额 ${money(all.s)} · ≤${THR.tacosG}% 绿 · 专题见 04`)}
+      </div>
+      <div class="panel" style="margin-top:14px"><div class="pb-lb"><b class="${uRateAll>=tp?'up':'dn'}">销量达成 ${pctStr(uRateAll)}</b><span>进度条深色竖线 = 月时间进度参照 · 退款率 ${all.u?pctStr(all.rf/all.u*100):'0%'}（≤${THR.refundG}% 绿）</span></div>
+        <div class="bar"><div class="fill ${uRateAll<8?'dnb':''}" style="width:${Math.min(100,Math.max(0,uRateAll))}%"></div><div class="mark" data-lb="${pctStr(tp)}" style="left:${Math.min(95,tp)}%"></div></div></div>
     </div>
     ${conclOv}
-    ${actionListHtml(actItems)}
-    ${impCards}
-    <div class="sec">
-      <div class="sec-h"><h2>店铺达成</h2><span class="hint">利润目标口径 = 销售净毛利金额 + 净毛利率 · 点击卡片逐层钻取</span></div>
-      <div class="grid3">${storeCards}</div>
-    </div>
-    ${lvBlock}
+    <div class="sec"><div class="sec-h"><h2>P0 告警速览（≤5 条）</h2><span class="hint">按涉及金额排序 · 点击直达「05 行动跟进」处理</span></div>
+      <div class="panel"><table><thead><tr><th>类型</th><th>单品</th><th>依据</th><th class="r">涉及金额</th></tr></thead><tbody>
+      ${top5.map(x => `<tr class="rowbtn" data-v="act">
+        <td><span class="actag ${x.best.tone}">${x.best.t}</span></td>
+        <td class="tname">${esc(x.nm.length > 24 ? x.nm.slice(0,24) + '…' : x.nm)}<br><span class="asin">${x.asin}</span></td>
+        <td>${x.best.ev}</td>
+        <td class="r ${x.best.tone === 'b' ? 'up' : 'dn'}"><b>${money(x.best.amt)}</b></td></tr>`).join('') || '<tr><td colspan="4" class="dnote">无 P0 告警</td></tr>'}
+      </tbody></table></div></div>
     <div class="foot">
-      <b>使用说明</b><br>
-      · 六层平级各拆各的维度：总览（大盘）→ 店铺 → 品类 → 父体 → 单品 → 数据（按日明细）；品类/父体/单品/数据均为整店口径，不再重复拆店铺<br>
-      · 进度条上的深色竖线 = 月时间进度参照；退款率 8% 为预警线<br>
-      · 周报 / 月报文案模板待样例后接入导出（当前「日/周/月报」页提供周期汇总数据）
+      <b>导航 = 分析主线</b>：01 总览（差多少）→ 02 目标与差异（为什么差）→ 03 经营下钻（差在谁身上：店铺对比→品类→父体→单品）→ 04 专题监控（流量/广告/库存/价格售后各抓一个杠杆）→ 05 行动跟进（怎么补、补了吗）→ 06 日/周/月报（沉淀）→ 07 数据管理（口径与治理）<br>
+      · 每页只回答一问；单品点击行进按日明细（详情页）<br>
+      · 周报 / 月报文案模板待样例后接入导出
     </div>`;
-  bindCopyAct(actItems);
 }
 
 /* ================= 拆解链路：总览→店铺→品类→父体→单品→数据（平级，各页只拆自己的维度） ================= */
@@ -710,14 +737,20 @@ function repNameOf(rows, pi){
   return DB.names[bi];
 }
 
-/* 店铺层 */
+/* 店铺层（03 经营下钻 · 3.1 店铺对比） */
 function vStore(st){
   const nm = DB.stores[st];
   if(nm === undefined){ navTo({v:'ov'}); return; }
-  $crumbV.textContent = '店铺 · ' + nm;
+  $crumbV.textContent = '店铺对比';
   const rows = actRows().filter(r => r[F.st] === st);
   const a = agg(rows), t = tgtOf(st);
   const bd = byDay(rows);
+  /* 三店铺横向对比 */
+  const cmp = DB.stores.map((nm2, i) => {
+    const rs = actRows().filter(r => r[F.st] === i);
+    const a2 = agg(rs), t2 = tgtOf(i);
+    return {nm: nm2, i, a: a2, t: t2, hs: healthState(a2, t2)};
+  });
 
   const refTop = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)}))
     .filter(x => x.a.rf > 0).sort((x,y) => y.a.rf - x.a.rf).slice(0, 5);
@@ -776,7 +809,19 @@ function vStore(st){
   $app.innerHTML = `
     ${levelCrumb('st')}
     ${storeTabs(st, 'st')}
-    <div class="dnote">${nm} · 实际 ${DB.days[0]}~${DB.days[DB.days.length-1]} · 目标指标只考核销量+利润，其他维度辅助总结 · 单品行可进入数据页</div>
+    <div class="dnote">${nm} · 店铺是资源分配单元：对比谁健康谁拖后腿，资源向健康店铺倾斜 · 单品行可进单品层</div>
+    <div class="sec"><div class="sec-h"><h2>三店铺横向对比</h2><span class="hint">灯 = 达成节奏 vs 时间进度 ${pctStr(timeProg())} · 点击行进入该店明细</span></div>
+      <div class="panel"><table><thead><tr><th>店铺</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th class="r">销量达成</th><th class="r">利润达成</th><th class="r">退款率</th><th>判定</th></tr></thead><tbody>
+      ${cmp.map(c => `<tr class="rowbtn" data-v="st" data-st="${c.i}">
+        <td class="tname">${esc(c.nm)}</td>
+        <td class="r">${numStr(c.a.u)}</td><td class="r">${money(c.a.s)}</td>
+        <td class="r ${c.a.p>=0?'up':'dn'}"><b>${money(c.a.p)}</b></td>
+        <td class="r gm ${gmCls(c.a.gm)}">${pctStr(c.a.gm)}</td>
+        <td class="r">${c.t.u ? pctStr(c.a.u/c.t.u*100) + ' ' + lampHtml(lamp(c.t.u ? c.a.u/c.t.u*100 : 0, timeProg()*1.1, timeProg()*0.75, 1)) : '-'}</td>
+        <td class="r">${c.t.p ? pctStr(c.a.p/c.t.p*100) + ' ' + lampHtml(lamp(c.t.p ? c.a.p/c.t.p*100 : 0, timeProg()*1.1, timeProg()*0.75, 1)) : '-'}</td>
+        <td class="r">${c.a.u ? pctStr(c.a.rf/c.a.u*100) : '0%'}</td>
+        <td>${lampHtml(c.hs.s === 'danger' ? 'w' : (c.hs.s === 'ok' ? 'g' : 'y'), c.hs.lb)}</td></tr>`).join('')}
+      </tbody></table></div></div>
     ${conclSt}
     ${actionListHtml(actItemsSt)}
     <div class="sec"><div class="grid4">${rateKpis(a, t, nm)}</div></div>
@@ -832,6 +877,23 @@ function vCatPage(){
   const top1 = statsCats[0];
   const gmTop = [...statsCats].sort((x,y) => y.a.gm - x.a.gm)[0];
   const gmLow = [...statsCats].sort((x,y) => x.a.gm - y.a.gm)[0];
+
+  /* --- 品类四象限：x = 月内销量增速（近7日 vs 此前日均），y = 净利率，气泡 = 销售额 --- */
+  const nd = DB.days.length, k7 = Math.min(7, Math.max(1, nd - 1));
+  const qPts = statsCats.map(x => {
+    const old = rows.filter(r => r[F.cat] === x.ci && r[F.d] < nd - k7);
+    const neu = rows.filter(r => r[F.cat] === x.ci && r[F.d] >= nd - k7);
+    const gA = old.reduce((s,r) => s + r[F.u], 0)/Math.max(nd - k7, 1);
+    const gB = neu.reduce((s,r) => s + r[F.u], 0)/k7;
+    const gr = gA > 0 ? (gB - gA)/gA*100 : (gB > 0 ? 100 : 0);
+    return {lb: DB.cats[x.ci], x: gr, y: x.a.gm, r: x.a.s, c: x.a.gm >= 8 ? (gr >= 0 ? '#2E9E6B' : '#8FA4B4') : (gr >= 0 ? '#C98A1B' : '#B8423A'), big: x.a.s >= a.s*0.12};
+  });
+  const qMax = Math.max(...qPts.map(p => p.r), 1);
+  const quadOf = p => p.y >= 8 ? (p.x >= 0 ? '明星·押注' : '现金牛·维持') : (p.x >= 0 ? '问题·诊断' : '瘦狗·退出');
+  const quadAgg = {};
+  qPts.forEach((p, i) => { const q = quadOf(p); const o = quadAgg[q] || (quadAgg[q] = {n:0, s:0, p:0}); o.n++; o.s += p.r; o.p += statsCats[i].a.p; });
+  const quadColor = {'明星·押注':'#2E9E6B', '现金牛·维持':'#8FA4B4', '问题·诊断':'#C98A1B', '瘦狗·退出':'#B8423A'};
+  const quadStrategy = {'明星·押注':'加库存、加广告、扩变体——预算向这里集中', '现金牛·维持':'保库存不断货，不追加投入', '问题·诊断':'先查是流量买贵还是履约太重，限期改善', '瘦狗·退出':'清仓或合并，释放资金'};
   const conclCat = conclBox([
     {k:'集中', tone:'f', txt:`TOP3 品类占整店销售额 <b>${pctStr(top3Share)}</b>${top3Share > 60 ? '，<span class="hl">头部品类的流量与库存波动直接决定大盘，优先保供与稳广告</span>' : '，结构分散度可接受'}。`},
     (top1 ? {k:'头部', tone:'f', txt:`头部品类【${esc(DB.cats[top1.ci])}】销售额 ${money(top1.a.s)}（占 <b>${pctStr(top1.a.s/Math.max(a.s,1)*100)}</b>）· 净毛利 ${money(top1.a.p)}${a.p > top1.a.p * 0.5 ? '（占 ' + pctStr(top1.a.p/Math.max(a.p,1)*100) + '）' : '，<span class="hl">整店净毛利（' + money(a.p) + '）被亏损品类大幅抵消——先处置亏损品类，头部赚的被亏的吃掉了</span>'}${top1.a.s/a.s > 0.4 ? ' —— <span class="hl">单一品类依赖偏高，其断货/差评将直接冲击整店，优先盯库存与评分</span>' : ''}。`} : null),
@@ -848,6 +910,13 @@ function vCatPage(){
       ${distChart('销售额分布', '钱从哪些品类来', statsCats.map(x => ({lb: DB.cats[x.ci], v: x.a.s, c:'#1BA3B8', fmt: money})))}
       ${distChart('净毛利率对比', '高于整店均值 ${pctStr(a.gm)} 为绿色', statsCats.map(x => ({lb: DB.cats[x.ci], v: Math.max(x.a.gm, 0), c: x.a.gm >= a.gm ? 'var(--teal)' : 'var(--coral)', fmt: v => pctStr(x.a.gm)})))}
     </div></div>`;
+  const quadGrid = `<div class="sec"><div class="sec-h"><h2>品类四象限（增长 × 盈利）</h2><span class="hint">横轴 = 月内销量增速（近${k7}日 vs 此前日均）· 纵轴 = 净利率（分界 ${THR.cvrG}% 全店健康线附近）· 气泡 = 销售额</span></div>
+    <div class="panel" style="padding:14px 18px">
+      ${svgScatter(qPts, {rMax: qMax, yLine: 8})}
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">
+        ${Object.keys(quadAgg).sort().map(q => `<span class="chipstat" style="border-radius:8px;padding:6px 12px;background:${quadColor[q]}14;border:1px solid ${quadColor[q]}44"><b style="color:${quadColor[q]}">${q}</b> ${quadAgg[q].n} 个 · 销售 ${money(quadAgg[q].s)} · 净利 ${money(quadAgg[q].p)}<br><small style="color:var(--sub)">${quadStrategy[q]}</small></span>`).join('')}
+      </div>
+    </div></div>`;
 
   $app.innerHTML = `
     ${levelCrumb('cat')}
@@ -861,6 +930,7 @@ function vCatPage(){
         ${kpiCard(totalIv > 0 ? 'warn' : 'mid', IC.pct, '滞销占压', money(totalIv), '全部品类滞销货值合计（汇总快照）')}
       </div></div>
     ${chartGrid}
+    ${quadGrid}
     <div class="sec"><div class="sec-h"><h2>品类排行</h2><span class="hint">按净毛利排序 · 仅月销量 ≥ ${MIN_U} 件的品类 · 点击进入父体层</span></div>
       <div class="panel"><table><thead><tr><th>品类</th><th class="r">单品数</th><th class="r">销量</th><th class="r">日均</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th class="r">滞销货值</th><th class="r">库周转(均)</th><th>毛利贡献</th></tr></thead><tbody>
       ${dispCats.map(x => `<tr class="rowbtn" data-v="pt" data-c="${x.ci}">
@@ -894,7 +964,9 @@ function vParentPage(c){
     .sort((x, y) => y.p - x.p).map(o => ({v: o.ci, lb: DB.cats[o.ci] + '（' + numStr(o.u) + ' 件）'}));
   const pars = [...groupBy(rows, F.pa).entries()].map(([pi, rs]) => {
     const pa = agg(rs);
-    return {pi, pa, rep: repNameOf(rows, pi)};
+    const vs = [...groupBy(rs, F.a).values()];
+    const dyn = vs.length ? vs.filter(vrs => agg(vrs).u > 0).length/vs.length*100 : 0;
+    return {pi, pa, rep: repNameOf(rows, pi), nv: vs.length, dyn};
   }).sort((x,y) => y.pa.p - x.pa.p);
   const aP = agg(rows);
   const maxP = Math.max(...pars.map(x => Math.abs(x.pa.p)), 1);
@@ -928,10 +1000,12 @@ function vParentPage(c){
     </div>
     ${conclPt}
     <div class="dnote" style="margin-top:8px">整店口径${catSel !== 'all' ? ' · 已筛选品类【' + esc(DB.cats[catSel]) + '】' : ''} · 父产品名称为"-"的按 父ASIN→ASIN 兜底归组 · 点击父体行进入单品层</div>
-    <div class="sec"><div class="sec-h"><h2>父体排行</h2><span class="hint">按净毛利排序 · 月销量 ≥ ${MIN_U} 件共 ${dispPars.length} 个父体（另有 ${lowPars.length} 个微量父体已折叠）</span></div>
-      <div class="panel"><table><thead><tr><th>父体（代表单品）</th><th>父ASIN</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
+    <div class="sec"><div class="sec-h"><h2>父体排行</h2><span class="hint">按净毛利排序 · 月销量 ≥ ${MIN_U} 件共 ${dispPars.length} 个父体（另有 ${lowPars.length} 个微量父体已折叠）· 动销变体率 &lt;40% = 变体堆砌</span></div>
+      <div class="panel"><table><thead><tr><th>父体（代表单品）</th><th>父ASIN</th><th class="r">变体数</th><th class="r">动销变体率</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
       ${dispPars.map(x => `<tr class="rowbtn" data-v="sku" data-pa="${x.pi}">
         <td class="tname">${esc(x.rep)}</td><td class="asin">${esc(DB.parents[x.pi])}</td>
+        <td class="r">${x.nv}</td>
+        <td class="r ${x.dyn < 40 ? 'dn' : ''}">${pctStr(x.dyn)} ${x.dyn < 40 ? lampHtml('w') : ''}</td>
         <td class="r">${numStr(x.pa.u)}</td><td class="r">${money(x.pa.s)}</td>
         <td class="r ${x.pa.p>=0?'up':'dn'}">${money(x.pa.p)}</td>
         <td class="r gm ${gmCls(x.pa.gm)}">${pctStr(x.pa.gm)}</td>
@@ -943,11 +1017,11 @@ function vParentPage(c){
 
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-/* 单品层：整店口径 · 父体筛选用于从父体往下钻 */
-function vSkuPage(pa){
-  $crumbV.textContent = '单品';
+/* 单品层（03 经营下钻 · 3.4 单品分层）：整店口径 · 父体筛选用于从父体往下钻 */
+function vSkuPage(pa, ly){
+  $crumbV.textContent = '单品分层';
   const allRows = actRows();
-  let rows = allRows, paSel = 'all';
+  let rows = allRows, paSel = 'all', lySel = 'all';
   if(pa !== undefined && pa !== '' && DB.parents[Number(pa)] !== undefined){
     rows = allRows.filter(r => r[F.pa] === Number(pa));
     paSel = Number(pa);
@@ -955,8 +1029,36 @@ function vSkuPage(pa){
   const paOpts = [...groupBy(allRows, F.pa).entries()].map(([pi, rs]) => ({pi, p: agg(rs).p}))
     .sort((x, y) => y.p - x.p)
     .map(o => ({v: o.pi, lb: repNameOf(allRows, o.pi).slice(0, 22) + ' · ' + DB.parents[o.pi]}));
-  const skus = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
-  const maxP = Math.max(...skus.map(x => Math.abs(x.a.p)), 1);
+  /* --- 五层分层（框架 3.1 量化标准，每月自动计算） --- */
+  const nd2 = DB.days.length, k2 = Math.min(7, Math.max(1, nd2 - 1));
+  const skus0 = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => {
+    const a = agg(rs), sp = sumOf(ai);
+    const old = rs.filter(r => r[F.d] < nd2 - k2), neu = rs.filter(r => r[F.d] >= nd2 - k2);
+    const gA = old.reduce((s,r) => s + r[F.u], 0)/Math.max(nd2 - k2, 1);
+    const gB = neu.reduce((s,r) => s + r[F.u], 0)/k2;
+    const gr = gA > 0 ? (gB - gA)/gA*100 : (gB > 0 ? 100 : 0);
+    let layer = '常规', tone = 'b';
+    if(a.p < 0){ layer = '止损'; tone = 'r'; }
+    else if(a.s >= 500 && a.gm >= 8 && gr >= 0){ layer = '爆款'; tone = 'g'; }
+    else if(a.s < 50 && sp && sp.kt > 90){ layer = '长尾'; tone = 'o'; }
+    return {ai, a, sp, gr, layer, tone};
+  }).sort((x,y) => y.a.p - x.a.p);
+  const layerCnt = {};
+  skus0.forEach(x => layerCnt[x.layer] = (layerCnt[x.layer] || 0) + 1);
+  if(ly !== undefined && ly !== '' && ['爆款','止损','长尾','常规'].includes(ly)) lySel = ly;
+  const skus = lySel === 'all' ? skus0 : skus0.filter(x => x.layer === lySel);
+  /* 级别利润率对比（原总览下沉） */
+  const lvMap = {};
+  skus0.forEach(x => {
+    const lvName = x.sp ? (DB.lvs[x.sp.lv] || '未评级') : '未评级';
+    const m = lvMap[lvName] || (lvMap[lvName] = {s:0, p:0, n:0});
+    m.s += x.a.s; m.p += x.a.p; m.n++;
+  });
+  const lvList = Object.keys(lvMap).map(k => ({lb: k, v: lvMap[k].s ? lvMap[k].p/lvMap[k].s*100 : 0, n: lvMap[k].n, c: lvMap[k].p >= 0 ? 'var(--teal)' : 'var(--coral)'}))
+    .filter(x => x.n >= 3).sort((x,y) => y.v - x.v).map(x => ({lb: x.lb + '（' + x.n + '品）', v: x.v, c: x.c, fmt: v => pctStr(v)}));
+  const lvBlock = lvList.length ? `<div class="sec"><div class="sec-h"><h2>运营级别利润率对比</h2><span class="hint">级别与利润是否倒挂 · 倒挂品可申请复评升级</span></div>
+    <div class="panel" style="padding:14px 18px">${hbarRows(lvList)}</div></div>` : '';
+  const maxP = Math.max(...skus0.map(x => Math.abs(x.a.p)), 1);
   /* 微量单品不占版面：月销量<10件的小样本毛利失真 */
   const lowSkus = skus.filter(x => x.a.u < MIN_U);
   const dispSkus = skus.filter(x => x.a.u >= MIN_U);
@@ -966,28 +1068,35 @@ function vSkuPage(pa){
   const conclSku = conclBox([
     {k:'止血', tone: worstSku && worstSku.a.p < 0 ? 'r' : 'g', txt: worstSku && worstSku.a.p < 0
       ? `亏损最重的单品【${esc(DB.names[worstSku.ai].slice(0,18))}】（${DB.asins[worstSku.ai]}）净亏 <b class="hl">${money(worstSku.a.p)}</b> · 毛利率 ${pctStr(worstSku.a.gm)} —— 优先处置（停广告→核成本→清仓）。`
-      : '当前筛选范围无净亏损单品。'}
-  ]);
+      : '当前筛选范围无净亏损单品。'},
+    (layerCnt['止损'] ? {k:'分层', tone:'r', txt:`量化分层结果：爆款 ${layerCnt['爆款']||0} · 止损 <b>${layerCnt['止损']}</b> · 长尾 ${layerCnt['长尾']||0} · 常规 ${layerCnt['常规']||0}。止损层唯一指标是退出进度——30 天计划见「05 行动跟进」，不允许"再观察一个月"。`} : null)
+  ].filter(Boolean));
+  const lyOpts = ['爆款','止损','长尾','常规'].map(l => ({v: l, lb: l + '（' + (layerCnt[l] || 0) + '）'}));
 
   $app.innerHTML = `
     ${levelCrumb('sku')}
-    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <span style="font-size:12px;color:var(--sub)">父体筛选</span>
       ${selHtml('sku', 'pa', '全部父体', paOpts, paSel)}
+      <span style="font-size:12px;color:var(--sub);margin-left:10px">分层筛选</span>
+      ${selHtml('sku', 'ly', '全部分层', lyOpts, lySel)}
     </div>
     ${conclSku}
-    <div class="dnote" style="margin-top:8px">整店口径 · 月销量 ≥ ${MIN_U} 件共 ${dispSkus.length} 个单品（另有 ${lowSkus.length} 个微量单品已折叠） · 点击单品行进入数据页（按日明细逐字段）</div>
-    <div class="sec"><div class="sec-h"><h2>单品排行</h2><span class="hint">按净毛利排序 · 仅月销量 ≥ ${MIN_U} 件的单品</span></div>
-      <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
+    <div class="dnote" style="margin-top:8px">分层标准（每月自动计算）：爆款 = GMV≥$500 且月内增速≥0 且净利率≥8% · 止损 = 净毛利&lt;0 · 长尾 = GMV&lt;$50 且周转&gt;90天 · 月销量 ≥ ${MIN_U} 件共 ${dispSkus.length} 个单品（另有 ${lowSkus.length} 个微量单品已折叠） · 点击行进按日明细</div>
+    <div class="sec"><div class="sec-h"><h2>单品排行（带分层标签）</h2><span class="hint">按净毛利排序 · 仅月销量 ≥ ${MIN_U} 件</span></div>
+      <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th>分层</th><th class="r">月内增速</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
       ${dispSkus.map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}">
         <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
+        <td><span class="actag ${x.tone}">${x.layer}</span></td>
+        <td class="r ${x.gr >= 0 ? 'up' : 'dn'}">${pctStr(x.gr)}</td>
         <td class="r">${numStr(x.a.u)}</td><td class="r">${money(x.a.s)}</td>
         <td class="r ${x.a.p>=0?'up':'dn'}">${money(x.a.p)}</td>
         <td class="r gm ${gmCls(x.a.gm)}">${pctStr(x.a.gm)}</td>
         <td>${barCell(x.a.p, maxP)}</td></tr>`).join('')}
       </tbody></table>
-      ${lowSkus.length ? `<div class="dnote" style="margin-top:8px">已折叠 <b>${lowSkus.length}</b> 个月销量 &lt; ${MIN_U} 件的微量单品（合计 ${numStr(lowSumS.u)} 件 / ${money(lowSumS.s)} / 净毛利 ${money(lowSumS.p)}）——小样本下毛利与毛利率严重失真，没有统计指导意义；真实亏损问题单品仍会被「行动清单」点名。</div>` : ''}
-      </div></div>`;
+      ${lowSkus.length ? `<div class="dnote" style="margin-top:8px">已折叠 <b>${lowSkus.length}</b> 个月销量 &lt; ${MIN_U} 件的微量单品（合计 ${numStr(lowSumS.u)} 件 / ${money(lowSumS.s)} / 净毛利 ${money(lowSumS.p)}）——小样本下毛利与毛利率严重失真，没有统计指导意义；真实亏损问题单品仍会被「行动跟进」点名。</div>` : ''}
+      </div></div>
+    ${lvBlock}`;
 }
 
 /* 数据层面：单 ASIN 按日明细逐字段（整店口径） */
@@ -1077,6 +1186,463 @@ function vDetail(a){
       </tbody></table></div></div>`;
 }
 
+/* ================= 02 目标与差异：差多少 → 为什么差 ================= */
+function vGap(){
+  $crumbV.textContent = '目标与差异';
+  const all = agg(actRows());
+  const tp = timeProg();
+  const tgSum = {u:0, p:0};
+  DB.stores.forEach((_, i) => { const t = tgtOf(i); tgSum.u += t.u; tgSum.p += t.p; });
+  const uGap = Math.max(0, tgSum.u - all.u), pGap = tgSum.p - all.p;
+  const uRate = tgSum.u ? all.u/tgSum.u*100 : 0, pRate = tgSum.p ? all.p/tgSum.p*100 : 0;
+  const left = (DB.monthDays||30) - DB.days.length;
+
+  /* --- 2.1 四层达成：店铺目标表 + 缺口品类归因 --- */
+  const storeRowsHtml = DB.stores.map((nm, i) => {
+    const rows = actRows().filter(r => r[F.st] === i);
+    const a = agg(rows), t = tgtOf(i);
+    const ur = t.u ? a.u/t.u*100 : 0, pr = t.p ? a.p/t.p*100 : 0;
+    return `<tr>
+      <td class="tname">${esc(nm)}</td>
+      <td class="r">${numStr(a.u)}<small> / ${numStr(t.u)}</small></td>
+      <td class="r">${pctStr(ur)} ${t.u ? lampHtml(lamp(ur, tp*1.1, tp*0.75, 1)) : '-'}</td>
+      <td class="r ${a.p>=0?'up':'dn'}">${money(a.p)}<small> / ${money(t.p)}</small></td>
+      <td class="r">${pctStr(pr)} ${t.p ? lampHtml(lamp(pr, tp*1.1, tp*0.75, 1)) : '-'}</td>
+      <td class="r">${t.u ? numStr(Math.max(0, t.u - a.u)) : '-'}<small> 件</small></td>
+      <td class="r">${t.p ? money(t.p - a.p) : '-'}</td>
+      <td>${t.u && left > 0 ? '日均需 <b>' + numStr(Math.ceil(Math.max(0, t.u - a.u)/left)) + '</b> 件' : '-'}</td></tr>`;
+  }).join('');
+
+  /* 缺口归因：亏损品类合计（止损可回收上界） vs 头部品类贡献 */
+  const catAgg = [...groupBy(actRows(), F.cat).entries()].map(([ci, rs]) => ({ci, a: agg(rs)})).filter(x => x.a.u >= MIN_U);
+  const lossCats = catAgg.filter(x => x.a.p < 0).sort((x,y) => x.a.p - y.a.p).slice(0, 6);
+  const lossAll = catAgg.filter(x => x.a.p < 0).reduce((s,x) => s + x.a.p, 0);
+  const topCats = [...catAgg].sort((x,y) => y.a.p - x.a.p).slice(0, 3);
+
+  /* --- 2.2 三因子分解：近7日 vs 此前日均（GMV = Session × CVR × 客单价） --- */
+  const n = DB.days.length, k = Math.min(7, Math.max(1, n - 1));
+  const rowsA = actRows();
+  const segOld = rowsA.filter(r => r[F.d] < n - k), segNew = rowsA.filter(r => r[F.d] >= n - k);
+  const dOld = n - k, dNew = k;
+  const S0 = segOld.reduce((s,r) => s + r[F.ses], 0)/dOld, S1 = segNew.reduce((s,r) => s + r[F.ses], 0)/dNew;
+  const O0 = segOld.reduce((s,r) => s + r[F.ord], 0)/dOld, O1 = segNew.reduce((s,r) => s + r[F.ord], 0)/dNew;
+  const G0 = segOld.reduce((s,r) => s + r[F.s], 0)/dOld, G1 = segNew.reduce((s,r) => s + r[F.s], 0)/dNew;
+  const C0 = S0 ? O0/S0*100 : 0, C1 = S1 ? O1/S1*100 : 0;           /* CVR%（订单/Sessions） */
+  const A0 = O0 ? G0/O0 : 0, A1 = O1 ? G1/O1 : 0;                    /* 客单价 $ */
+  /* 因子桥：ΔGMV = ΔS×C0×A0 + S1×ΔC×A0 + S1×C1×ΔA */
+  const fS = (S1-S0)*C0/100*A0, fC = S1*(C1-C0)/100*A0, fA = S1*C1/100*(A1-A0);
+  const dG = G1 - G0;
+  const fTot = Math.abs(fS) + Math.abs(fC) + Math.abs(fA) || 1;
+  const fmtC = v => pctStr(v);
+  const facRow = (lb, v, c, note) => `<div class="hrow"><span class="lb">${lb}</span><span class="tk"><i style="width:${(Math.abs(v)/fTot*100).toFixed(1)}%;background:${v>=0?(c||'#2E9E6B'):'#B8423A'}"></i></span><span class="v">${v>=0?'+':''}${money(v,0)}</span></div>
+    <div style="font-size:11px;color:var(--faint);margin:-2px 0 8px 132px">${note}（解释度 ${pctStr(Math.abs(v)/fTot*100)}）</div>`;
+
+  /* --- 2.3 双口径利润树：经营毛利（卖货能力） vs 净毛利（含售后） --- */
+  /* 售后负担 ≈ 退货订单件数 × 售价（退货订单口径）；经营毛利 = 净毛利 + 售后负担（估算口径，见注记） */
+  let refAmt = 0, refN = 0;
+  const rf = DB.rf || null;
+  if(rf){
+    const asinSet = new Set(rowsA.map(r => r[F.a]));
+    Object.keys(rf.byA).forEach(kk => { if(asinSet.has(Number(kk))){ refAmt += rf.byA[kk] * ((sumOf(Number(kk))||{}).pr || 0); } });
+    refN = Object.keys(rf.byA).filter(kk => asinSet.has(Number(kk))).reduce((s,kk) => s + rf.byA[kk], 0);
+  }
+  const gpOper = all.p + refAmt;
+  const treeRow = (lb, v, tone, note) => `<tr><td class="tname">${lb}</td><td class="r ${tone==='dn'?'dn':''}"><b>${money(v)}</b></td><td class="r">${pctStr(v/Math.max(all.s,1)*100)}</td><td>${note}</td></tr>`;
+
+  const conclGap = conclBox([
+    {k:'差多少', tone: pGap > 0 ? 'r' : 'g', txt: tgSum.p ? `销量缺口 <b class="hl">${numStr(uGap)}</b> 件（达成 ${pctStr(uRate)} / 时间进度 ${pctStr(tp)}）· 利润缺口 <b class="hl">${money(pGap)}</b>（达成 ${pctStr(pRate)}）。剩余 ${left} 天。` : `尚无目标数据（数据管理页录入月度目标后本页生效）。当前实际：销量 ${numStr(all.u)} 件 / 净毛利 ${money(all.p)}。`},
+    {k:'为什么差', tone:'f', txt: dG !== 0 ? `本月内节奏（近${k}日 vs 此前日均）：GMV 日均 ${dG>=0?'+':''}${money(dG)}，其中<span class="hl">流量效应 ${fS>=0?'+':''}${money(fS)}</span>（Sessions ${numStr(S0)}→${numStr(S1)}）、转化效应 ${fC>=0?'+':''}${money(fC)}（CVR ${pctStr(C0)}→${pctStr(C1)}）、客单效应 ${fA>=0?'+':''}${money(fA)}（$${A0.toFixed(2)}→$${A1.toFixed(2)}）。${Math.abs(fS)/fTot>0.5 ? '缺口主要在流量端——查广告预算与关键词排名' : Math.abs(fC)/fTot>0.5 ? '缺口主要在转化端——改 listing（主图/价格/评分），不许加广告' : '缺口由多因子叠加，逐项看下方明细'}。` : '本月内节奏平稳。'},
+    (lossAll < 0 ? {k:'差在谁', tone:'r', txt:`净利结构中亏损品类合计 <b class="hl">${money(lossAll)}</b>——最大两个【${esc(DB.cats[lossCats[0].ci])}】${money(lossCats[0].a.p)}、【${esc(DB.cats[(lossCats[1]||lossCats[0]).ci])}】${money((lossCats[1]||lossCats[0]).a.p)}；头部品类贡献 ${money(topCats.reduce((s,x) => s + x.a.p, 0))}。处置清单见「05 行动跟进」。`} : null)
+  ].filter(Boolean));
+
+  $app.innerHTML = `
+    ${crumbHtml([{label:'目标与差异', v:'gap'}])}
+    <div class="dnote">回答四问中的两问：<b>差多少</b>（目标达成与缺口）→ <b>为什么差</b>（三因子分解 + 利润结构）→ 差在谁身上进「经营下钻」→ 怎么补进「行动跟进」</div>
+    ${conclGap}
+    <div class="sec"><div class="sec-h"><h2>2.1 目标达成 · 四层瀑布的顶层</h2><span class="hint">目标 = 考核目标 · 灯 = 达成节奏 vs 时间进度 ${pctStr(tp)} · 品类/父体/单品的缺口归因继续往下钻</span></div>
+      <div class="panel"><table><thead><tr><th>店铺</th><th class="r">销量 实际/目标</th><th class="r">销量达成</th><th class="r">净毛利 实际/目标</th><th class="r">利润达成</th><th class="r">销量缺口</th><th class="r">利润缺口</th><th>补救要求</th></tr></thead><tbody>
+      ${storeRowsHtml}
+      <tr class="tot"><td class="tname">合计</td><td class="r">${numStr(all.u)}<small> / ${numStr(tgSum.u)}</small></td><td class="r">${pctStr(uRate)} ${lampHtml(lamp(uRate, tp*1.1, tp*0.75, 1))}</td><td class="r ${all.p>=0?'up':'dn'}">${money(all.p)}<small> / ${money(tgSum.p)}</small></td><td class="r">${pctStr(pRate)} ${lampHtml(lamp(pRate, tp*1.1, tp*0.75, 1))}</td><td class="r">${numStr(uGap)}<small> 件</small></td><td class="r">${money(pGap)}</td><td>-</td></tr>
+      </tbody></table></div></div>
+    <div class="sec"><div class="sec-h"><h2>2.2 三因子分解 · GMV 日均节奏（近 ${k} 日 vs 此前 ${dOld} 日）</h2><span class="hint">GMV = Sessions × 订单转化率 CVR × 客单价 AOV · 回答"缺的是流量、转化还是客单"</span></div>
+      <div class="panel" style="padding:14px 18px">
+        <div class="chipstat" style="margin-bottom:12px">
+          <span>Sessions 日均 <b>${numStr(S0)} → ${numStr(S1)}</b>（${S0 ? pctStr((S1-S0)/S0*100) : '-'}）</span>
+          <span>CVR <b>${pctStr(C0)} → ${pctStr(C1)}</b>（灯 ${lampHtml(lamp(C1, THR.cvrG, THR.cvrY, 1))}）</span>
+          <span>客单价 <b>$${A0.toFixed(2)} → $${A1.toFixed(2)}</b></span>
+          <span>GMV 日均变化 <b class="${dG>=0?'up':'dn'}">${dG>=0?'+':''}${money(dG)}</b></span>
+        </div>
+        <div class="hbar">
+        ${facRow('流量效应', fS, '#1BA3B8', 'ΔSessions × 基期CVR × 基期客单：流量买够了没')}
+        ${facRow('转化效应', fC, '#2E9E6B', '现流量 × ΔCVR × 基期客单：listing 接不接得住')}
+        ${facRow('客单/结构效应', fA, '#C98A1B', '现流量 × 现CVR × Δ客单：组合装/价格结构')}
+        </div>
+        <div class="dnote" style="margin-top:6px">硬规则：单一因子解释度 &lt; 30% 时不得单独作为归因结论（防止甩锅单因子）。全店 CVR 绿 ≥${THR.cvrG}% / 黄 ${THR.cvrY}-${THR.cvrG}% / 红 &lt;${THR.cvrY}%。</div>
+      </div></div>
+    <div class="sec"><div class="sec-h"><h2>2.3 双口径利润树 · 经营毛利 vs 净毛利</h2><span class="hint">经营毛利 = 卖货能力（不含售后）· 净毛利 = 落袋（含售后负担）· 售后负担为估算口径</span></div>
+      <div class="panel"><table><thead><tr><th>口径</th><th class="r">金额</th><th class="r">占销售额</th><th>说明</th></tr></thead><tbody>
+        ${treeRow('销售额 GMV', all.s, '', '实际销售口径')}
+        ${treeRow('− 采购+头程成本', -(all.pur), '', '按日表采购成本字段')}
+        ${treeRow('− FBA配送费', -(all.fba), '', '履约成本：单件模型见「单品分层」')}
+        ${treeRow('− 销售佣金', -(all.comm), '', '平台佣金')}
+        ${treeRow('− 广告花费', -(all.ad), '', 'TACOS ' + pctStr(all.s ? all.ad/all.s*100 : 0) + '（灯 ' + lampHtml(lamp(all.s ? all.ad/all.s*100 : 999, THR.tacosG, THR.tacosY, -1)) + ' ≤' + THR.tacosG + '% 绿）')}
+        ${treeRow('− Coupon/Deal', -(all.cpn), '', '促销折让')}
+        ${treeRow('= 经营毛利（估算）', gpOper, gpOper >= 0 ? 'up' : 'dn', '净毛利 + 售后负担：反映卖货本身赚不赚')}
+        ${treeRow('− 售后负担（退货订单口径）', -refAmt, 'dn', `退货 ${numStr(refN)} 件 × 售价（上界估算，未扣回库再售回收）· 占销售额 ${pctStr(refAmt/Math.max(all.s,1)*100)}，健康线 ≤8% ${lampHtml(lamp(refAmt/Math.max(all.s,1)*100, 3, THR.refundG, -1))}`)}
+        ${treeRow('= 净毛利（积加原生）', all.p, all.p >= 0 ? 'up' : 'dn', '考核口径')}
+      </tbody></table>
+      <div class="dnote" style="margin-top:8px">若 <b>经营毛利为正、净毛利为负</b>：亏损来自售后（退货/跨期退款），动作是清残局与退货归因，不是砍广告；若<b>经营毛利为负</b>：结构性亏损，动产品形态与价格带（见 04 专题·价格与售后）。</div>
+      </div></div>
+    <div class="sec"><div class="sec-h"><h2>缺口归因 · 亏损品类 TOP（差在谁身上）</h2><span class="hint">月销量 ≥ ${MIN_U} 件 · 点击品类进父体层继续下钻</span></div>
+      <div class="panel"><table><thead><tr><th>品类</th><th class="r">销量</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>对整店的影响</th></tr></thead><tbody>
+      ${lossCats.map(x => `<tr class="rowbtn" data-v="pt" data-c="${x.ci}">
+        <td class="tname">${esc(DB.cats[x.ci])}</td>
+        <td class="r">${numStr(x.a.u)}</td>
+        <td class="r dn"><b>${money(x.a.p)}</b></td>
+        <td class="r dn">${pctStr(x.a.gm)}</td>
+        <td>吃掉整店净毛利 ${pctStr(Math.abs(x.a.p)/Math.max(topCats.reduce((s,y) => s + y.a.p, 0), 1)*100)}（相对头部贡献）</td></tr>`).join('') || '<tr><td colspan="5" class="dnote">无亏损品类</td></tr>'}
+      </tbody></table></div></div>`;
+}
+
+/* ================= 04 专题监控：一专题一杠杆 ================= */
+/* 4.1 流量转化 · 杠杆：CVR */
+function vTf(){
+  $crumbV.textContent = '专题 · 流量转化';
+  const rows = actRows();
+  const a = agg(rows);
+  const cvr = a.ses ? a.ord/a.ses*100 : 0;
+  const aov = a.ord ? a.s/a.ord : 0;
+  const upo = a.ord ? a.u/a.ord : 0;   /* 件/单 */
+  const cvrLamp = lamp(cvr, THR.cvrG, THR.cvrY, 1);
+  const upoLamp = lamp(upo, 1.3, 1.15, 1);
+  /* 有流量零转化：Sessions≥THR.sesN 且 0 单 */
+  const skuAgg = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)}));
+  const zeroConv = skuAgg.filter(x => x.a.ses >= THR.sesN && x.a.ord === 0).sort((x,y) => y.a.ses - x.a.ses);
+  const noTraffic = skuAgg.filter(x => x.a.ses === 0).map(x => ({...x, fk: (sumOf(x.ai)||{}).fk || 0})).filter(x => x.fk > 0);
+  const conclTf = conclBox([
+    {k:'杠杆', tone: cvrLamp === 'g' ? 'g' : (cvrLamp === 'w' ? 'r' : 'o'), txt: `全店 CVR <b>${pctStr(cvr)}</b> ${lampHtml(cvrLamp)}（绿 ≥${THR.cvrG}% / 黄 ${THR.cvrY}-${THR.cvrG}% / 红 &lt;${THR.cvrY}%）。${cvrLamp !== 'g' ? '<span class="hl">listing 整改（主图/价格/评分）优先级高于加投放——流量买来了接不住，加广告=放大浪费</span>' : '转化健康，增长优先走流量端'}。`},
+    (zeroConv.length ? {k:'异常', tone:'r', txt:`<b>${zeroConv.length}</b> 个 ASIN 有流量零转化（Sessions ≥ ${THR.sesN} 且 0 单）——白烧的流量，每周清一批：改主图/价格/差评，2 周无改善停投。`} : null),
+    (upoLamp !== 'g' ? {k:'结构', tone:'o', txt:`件/单 <b>${upo.toFixed(2)}</b>（绿 ≥1.3）——组合装/多件折扣是拉低 FBA 费占比的第一杠杆，当前未生效。`} : null)
+  ].filter(Boolean));
+  $app.innerHTML = `
+    ${crumbHtml([{label:'专题监控', v:'gap'}, {label:'流量转化', v:'tf'}])}
+    <div class="dnote">杠杆指标：<b>CVR</b>。它动了，GMV 跟着动。GMV = Sessions ${numStr(a.ses)} × CVR ${pctStr(cvr)} × 客单 $${aov.toFixed(2)}</div>
+    ${conclTf}
+    <div class="sec"><div class="grid4">
+      ${kpiCard(cvrLamp === 'g' ? '' : (cvrLamp === 'y' ? 'mid' : 'warn'), IC.pct, 'CVR（杠杆）', pctStr(cvr), `订单 ${numStr(a.ord)} / Sessions ${numStr(a.ses)} · 绿 ≥${THR.cvrG}%`)}
+      ${kpiCard('mid', IC.trend, 'Sessions', numStr(a.ses), `日均 ${numStr(a.ses/DB.days.length)} · 流量端问题查广告与排名`)}
+      ${kpiCard('', IC.coin, '客单价 AOV', '$' + aov.toFixed(2), `件/单 ${upo.toFixed(2)} ${lampHtml(upoLamp)} · 绿 ≥1.3`)}
+      ${kpiCard(zeroConv.length ? 'warn' : 'mid', IC.refund, '零转化 ASIN', numStr(zeroConv.length), `Sessions≥${THR.sesN} 且 0 单 · 每周清一批`)}
+    </div></div>
+    <div class="sec"><div class="sec-h"><h2>有流量零转化清单</h2><span class="hint">Sessions ≥ ${THR.sesN} 且 0 单 · 按 Sessions 排序 · 点击进单品按日明细</span></div>
+      <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">Sessions</th><th class="r">订单</th><th class="r">库存</th><th>动作</th></tr></thead><tbody>
+      ${zeroConv.slice(0, 15).map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}">
+        <td class="tname">${esc(DB.names[x.ai].slice(0, 26))}</td><td class="asin">${DB.asins[x.ai]}</td>
+        <td class="r"><b>${numStr(x.a.ses)}</b></td><td class="r dn">0</td>
+        <td class="r">${numStr((sumOf(x.ai)||{}).fk || 0)}</td>
+        <td>改主图 / 调价 / 查差评 → 2 周无改善停投</td></tr>`).join('') || '<tr><td colspan="6" class="dnote">无零转化 ASIN</td></tr>'}
+      ${zeroConv.length > 15 ? `<tr><td colspan="6" class="dnote">仅展示前 15 / 共 ${zeroConv.length} 个——完整清单按周分批处理</td></tr>` : ''}
+      </tbody></table></div></div>
+    <div class="sec"><div class="sec-h"><h2>零流量但有库存</h2><span class="hint">Sessions = 0 且 FBA 有货 · 不允许"放着"：要么推、要么清</span></div>
+      <div class="panel"><div class="chipstat">
+        <span>数量 <b>${noTraffic.length}</b> 个</span>
+        <span>压的库存 <b>${numStr(noTraffic.reduce((s,x) => s + x.fk, 0))}</b> 件</span>
+        <span>占压货值约 <b>${money(noTraffic.reduce((s,x) => s + x.fk*((sumOf(x.ai)||{}).pr || 0), 0))}</b></span>
+      </div>
+      <div class="dnote" style="margin-top:8px">${noTraffic.length ? '处置路径：给 2 周 Citation/社交流量测试 → 有转化转主推，无转化转清仓。清单在「单品分层」页用父体筛选排查。' : '当前无零流量在库 ASIN。'}</div></div></div>`;
+}
+
+/* 4.2 广告 · 杠杆：TACOS */
+function vAdw(){
+  $crumbV.textContent = '专题 · 广告';
+  const rows = actRows();
+  const a = agg(rows);
+  const tacos = a.s ? a.ad/a.s*100 : 0;
+  const adOrd = a.s ? a.ads*a.ord/a.s : 0;   /* 广告订单 ≈ 广告销售额 ÷ 客单价 */
+  const adDep = a.ord ? adOrd/a.ord*100 : 0;
+  const tLamp = lamp(tacos, THR.tacosG, THR.tacosY, -1);
+  const dLamp = adDep > THR.depN ? 'w' : (adDep > 60 ? 'y' : 'g');
+  const skuAgg = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs), sp: sumOf(ai)}));
+  const acosHi = skuAgg.filter(x => x.a.ads > 0 && x.a.ad >= 20 && x.a.ad/x.a.ads > 1).map(x => ({...x, acos: x.a.ad/x.a.ads*100, waste: x.a.ad - x.a.ads*x.a.gm/100})).sort((x,y) => y.waste - x.waste);
+  const burn = skuAgg.filter(x => x.a.ad >= 10 && x.a.ads === 0).sort((x,y) => y.a.ad - x.a.ad);
+  const depHi = skuAgg.filter(x => x.a.ord >= 10 && x.a.s > 0 && x.a.ads/x.a.s >= THR.depN/100).sort((x,y) => y.a.ads - x.a.ads);
+  const wasteAll = acosHi.reduce((s,x) => s + Math.max(x.waste, 0), 0);
+  const conclAd = conclBox([
+    {k:'杠杆', tone: tLamp === 'g' ? 'g' : 'o', txt: `全店 TACOS <b>${pctStr(tacos)}</b> ${lampHtml(tLamp)}（≤${THR.tacosG}% 绿 / ${THR.tacosG}-${THR.tacosY}% 黄 / &gt;${THR.tacosY}% 红）。${tLamp === 'g' ? '广告不是问题源，<span class="hl">禁止无差别砍预算</span>——砍广告救不了利润，退货才会（见 2.3 利润树）。' : '广告侵蚀超标：先关亏损投放，不动盈利 ASIN 预算。'}`},
+    (acosHi.length ? {k:'止血', tone:'r', txt:`<b>${acosHi.length}</b> 个 ASIN ACOS&gt;100%（白烧 ${money(wasteAll)}）——每周清零：直接关投放。`} : null),
+    (depHi.length ? {k:'依赖', tone:'o', txt:`<b>${depHi.length}</b> 个 ASIN 广告订单占比 ≥${THR.depN}%——停投即断崖，自然排名从未建立：逐个降竞价做自然位，不是一刀切停。`} : null)
+  ].filter(Boolean));
+  $app.innerHTML = `
+    ${crumbHtml([{label:'专题监控', v:'gap'}, {label:'广告', v:'adw'}])}
+    <div class="dnote">杠杆指标：<b>TACOS（广告费 ÷ 总销售额）</b>，不是 ACOS——TACOS 才描述广告对生意的真实侵蚀。新品期 ACOS&gt;60% 属买排名阶段，考核用回收期，不一刀切。</div>
+    ${conclAd}
+    <div class="sec"><div class="grid4">
+      ${kpiCard(tLamp === 'g' ? '' : (tLamp === 'y' ? 'mid' : 'warn'), IC.coin, 'TACOS（杠杆）', pctStr(tacos), `广告 ${money(a.ad)} ÷ 销售额 ${money(a.s)} · ≤${THR.tacosG}% 绿`)}
+      ${kpiCard('', IC.pct, '全店 ACOS', pctStr(a.ads ? a.ad/a.ads*100 : 0), '单均广告成本（估）：' + avgCpc(rows))}
+      ${kpiCard(dLamp === 'g' ? '' : (dLamp === 'y' ? 'mid' : 'warn'), IC.trend, '广告订单占比', pctStr(adDep), `估 ${numStr(adOrd)} / ${numStr(a.ord)} 单 · 正常 40-60% · ≥${THR.depN}% 危险`)}
+      ${kpiCard(acosHi.length ? 'warn' : 'mid', IC.refund, 'ACOS&gt;100% 投放', numStr(acosHi.length), `白烧合计 ${money(wasteAll)} · 每周清零`)}
+    </div></div>
+    <div class="sec"><div class="sec-h"><h2>ACOS&gt;100% 清单（按白烧金额排序）</h2><span class="hint">白烧 = 广告花费 − 广告销售额 × 净毛利率 · 点击进单品明细</span></div>
+      <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">ACOS</th><th class="r">广告花费</th><th class="r">广告销售</th><th class="r">白烧</th><th>动作</th></tr></thead><tbody>
+      ${acosHi.slice(0, 15).map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}">
+        <td class="tname">${esc(DB.names[x.ai].slice(0, 26))}</td><td class="asin">${DB.asins[x.ai]}</td>
+        <td class="r dn"><b>${pctStr(x.acos)}</b></td><td class="r">${money(x.a.ad, 2)}</td><td class="r">${money(x.a.ads, 2)}</td>
+        <td class="r dn"><b>${money(x.waste)}</b></td><td>关投放 / 降竞价</td></tr>`).join('') || '<tr><td colspan="7" class="dnote">无 ACOS&gt;100% 投放</td></tr>'}
+      </tbody></table></div></div>
+    ${burn.length ? `<div class="sec"><div class="sec-h"><h2>有花费无广告销售</h2><span class="hint">花钱没出单 · 连续出现直接暂停</span></div>
+      <div class="panel"><table><thead><tr><th>单品</th><th class="r">花费</th><th>动作</th></tr></thead><tbody>
+      ${burn.slice(0, 10).map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}"><td class="tname">${esc(DB.names[x.ai].slice(0, 30))}</td><td class="r">${money(x.a.ad, 2)}</td><td>暂停，排查关键词质量分</td></tr>`).join('')}
+      </tbody></table></div></div>` : ''}
+    ${depHi.length ? `<div class="sec"><div class="sec-h"><h2>广告依赖度 ≥${THR.depN}% 危险名单</h2><span class="hint">停投即断崖 · 逐个降竞价养自然位</span></div>
+      <div class="panel"><table><thead><tr><th>单品</th><th class="r">订单</th><th class="r">广告花费</th><th class="r">净毛利率</th></tr></thead><tbody>
+      ${depHi.slice(0, 10).map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}"><td class="tname">${esc(DB.names[x.ai].slice(0, 30))}</td><td class="r">${numStr(x.a.ord)}</td><td class="r">${money(x.a.ad, 2)}</td><td class="r ${x.a.gm>=0?'':'dn'}">${pctStr(x.a.gm)}</td></tr>`).join('')}
+      </tbody></table></div></div>` : ''}`;
+}
+function avgCpc(rows){
+  const clicks = 0; /* 积加按日表无点击字段，用 广告花费/广告订单(估) 近似 */
+  const a = agg(rows);
+  const adOrd = a.s ? a.ads*a.ord/a.s : 0;
+  return adOrd ? '$' + (a.ad/adOrd).toFixed(2) + '/单（广告）' : '-';
+}
+
+/* 4.3 库存 · 杠杆：可售天数 × 滞销占比 */
+function vInv(){
+  $crumbV.textContent = '专题 · 库存';
+  const rows = actRows();
+  const a = agg(rows);
+  const dailyU = a.u/Math.max(DB.days.length, 1);
+  let fk = 0, iq = 0, iv = 0, ageOld = 0, ageTot = 0;
+  const asinSet = [...new Set(rows.map(r => r[F.a]))];
+  const invs = [];
+  asinSet.forEach(ai => {
+    const sp = sumOf(ai); if(!sp) return;
+    fk += sp.fk; iq += sp.iq; iv += sp.iv;
+    if(sp.ag && sp.ag.length >= 8){ ageTot += sp.ag[0]+sp.ag[1]+sp.ag[2]+sp.ag[3]+sp.ag[4]+sp.ag[5]+sp.ag[6]+sp.ag[7]; ageOld += sp.ag[3]+sp.ag[4]+sp.ag[5]+sp.ag[6]+sp.ag[7]; }
+    invs.push({ai, sp, a: agg(rows.filter(r => r[F.a] === ai))});
+  });
+  const sellDays = dailyU ? fk/dailyU : 0;
+  const idlePct = (fk + iq) ? iq/(fk + iq)*100 : 0;
+  const oldPct = ageTot ? ageOld/ageTot*100 : 0;
+  const sdLamp = sellDays < 20 ? 'w' : (sellDays < THR.sdMin || sellDays > THR.sdMax ? 'y' : 'g');
+  const idLamp = lamp(idlePct, THR.idlePct, THR.idlePct*1.5, -1);
+  const zeroSold = invs.filter(x => x.a.u === 0 && x.sp.fk > 0).sort((x,y) => y.sp.fk - x.sp.fk);
+  const riskOos = invs.filter(x => x.sp.kt > 0 && x.sp.kt <= 15 && x.a.u > 0);
+  const oosNow = invs.filter(x => x.sp.fk <= 0 && x.a.u >= 3);
+  $app.innerHTML = `
+    ${crumbHtml([{label:'专题监控', v:'gap'}, {label:'库存', v:'inv'}])}
+    <div class="dnote">库存只有两个数字有决定性：<b>可售天数</b>（够不够、会不会压）和<b>滞销占比</b>（死钱有多少）。库龄结构为这两个数字服务。</div>
+    ${conclBox([
+      {k:'杠杆', tone: sdLamp === 'g' ? 'g' : 'o', txt:`全店可售天数 <b>${numStr(sellDays)}</b> 天 ${lampHtml(sdLamp)}（健康 ${THR.sdMin}-${THR.sdMax} 天 · &lt;20 天补货红警 · &gt;${THR.sdMax} 天停补+清仓）。${sellDays > THR.sdMax ? '<span class="hl">压库——停止补货计划，资源让给断货品</span>' : ''}`},
+      {k:'死钱', tone: idLamp === 'g' ? 'g' : 'r', txt:`滞销占比 <b>${pctStr(idlePct)}</b> ${lampHtml(idLamp)}（≤${THR.idlePct}% 绿）· 滞销货值 ${money(iv)} · 库龄&gt;90天占 ${pctStr(oldPct)}${oldPct > 20 ? '（超 20% 线，长期仓储费预警）' : ''}。`},
+      (zeroSold.length ? {k:'归零', tone:'r', txt:`<b>${zeroSold.length}</b> 个零销量有库存 ASIN（${numStr(zeroSold.reduce((s,x) => s + x.sp.fk, 0))} 件 / 货值 ~${money(zeroSold.reduce((s,x) => s + x.sp.fk*(x.sp.pr||0), 0))}）——每月必须归零处置：推 or 清，不允许放着。`} : null),
+      (oosNow.length ? {k:'断供', tone:'r', txt:`<b>${oosNow.length}</b> 个本月有销量但 FBA 可售 0——盈利品断供是纯机会损失，立即补货（清单见行动跟进）。`} : null)
+    ])}
+    <div class="sec"><div class="grid4">
+      ${kpiCard(sdLamp === 'g' ? '' : (sdLamp === 'y' ? 'mid' : 'warn'), IC.trend, '可售天数（杠杆）', numStr(sellDays) + '<small>  天</small>', `FBA可售 ${numStr(fk)} 件 ÷ 日销 ${numStr(dailyU)} 件`)}
+      ${kpiCard(idLamp === 'g' ? '' : 'warn', IC.pct, '滞销占比（杠杆）', pctStr(idlePct), `滞销 ${numStr(iq)} 件 / 总 ${numStr(fk + iq)} 件 · 货值 ${money(iv)}`)}
+      ${kpiCard(oldPct > 20 ? 'warn' : 'mid', IC.coin, '库龄&gt;90天占比', pctStr(oldPct), '超 20% 触发长期仓储费预警')}
+      ${kpiCard(oosNow.length ? 'warn' : 'mid', IC.refund, '断供在售', numStr(oosNow.length), '有销量无库存 · 净利日均×14 = 机会损失')}
+    </div></div>
+    <div class="sec"><div class="sec-h"><h2>零销量有库存 · 归零处置清单</h2><span class="hint">按压的库存件数排序 · 点击进单品明细</span></div>
+      <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">库存</th><th class="r">滞销货值</th><th class="r">库周转</th><th>动作</th></tr></thead><tbody>
+      ${zeroSold.slice(0, 15).map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}">
+        <td class="tname">${esc(DB.names[x.ai].slice(0, 26))}</td><td class="asin">${DB.asins[x.ai]}</td>
+        <td class="r"><b>${numStr(x.sp.fk)}</b></td><td class="r">${money(x.sp.iv || x.sp.fk*(x.sp.pr||0))}</td>
+        <td class="r">${x.sp.kt ? numStr(x.sp.kt) + ' 天' : '-'}</td>
+        <td>Outlet 清仓 / 合并组合装 / 移除</td></tr>`).join('') || '<tr><td colspan="6" class="dnote">无零销量在库 ASIN</td></tr>'}
+      ${zeroSold.length > 15 ? `<tr><td colspan="6" class="dnote">仅前 15 / 共 ${zeroSold.length} 个</td></tr>` : ''}
+      </tbody></table></div></div>
+    ${riskOos.length ? `<div class="sec"><div class="sec-h"><h2>断货风险（周转 ≤15 天且在售）</h2><span class="hint">补货或提价限流，每周更新</span></div>
+      <div class="panel"><table><thead><tr><th>单品</th><th class="r">可售</th><th class="r">周转</th><th class="r">本月销量</th><th class="r">净毛利</th></tr></thead><tbody>
+      ${riskOos.slice(0, 10).map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}"><td class="tname">${esc(DB.names[x.ai].slice(0, 30))}</td><td class="r">${numStr(x.sp.fk)}</td><td class="r dn">${numStr(x.sp.kt)} 天</td><td class="r">${numStr(x.a.u)}</td><td class="r ${x.a.p>=0?'up':'dn'}">${money(x.a.p)}</td></tr>`).join('')}
+      </tbody></table></div></div>` : ''}`;
+}
+
+/* 4.4 价格与售后 · 杠杆：价格带净利率 × 退款率 */
+function vRc(){
+  $crumbV.textContent = '专题 · 价格与售后';
+  const rows = actRows();
+  const a = agg(rows);
+  const refRate = a.u ? a.rf/a.u*100 : 0;
+  const rLamp = lamp(refRate, THR.refundG, THR.refundG*1.5, -1);
+  /* 价格带：按快照售价分 0-5 / 5-10 / 10-20 / 20+ */
+  const bands = [['$0-5', 0, 5], ['$5-10', 5, 10], ['$10-20', 10, 20], ['$20+', 20, 1e9]].map(([lb, lo, hi]) => ({lb, lo, hi}));
+  const skuAgg = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs), sp: sumOf(ai)}));
+  bands.forEach(b => {
+    const xs = skuAgg.filter(x => x.sp && x.sp.pr >= b.lo && x.sp.pr < b.hi);
+    b.n = xs.length; b.u = xs.reduce((s,x) => s + x.a.u, 0); b.s = xs.reduce((s,x) => s + x.a.s, 0);
+    b.p = xs.reduce((s,x) => s + x.a.p, 0); b.fba = xs.reduce((s,x) => s + x.a.fba, 0);
+    b.gm = b.s ? b.p/b.s*100 : 0; b.fbaR = b.s ? b.fba/b.s*100 : 0;
+  });
+  /* 退货归因 */
+  const rf = DB.rf || null;
+  let reasonRows = '', statHtml = '', retTop = '';
+  if(rf && rf.byR){
+    const reasons = Object.keys(rf.byR).map(k => ({lb: rsn(k), v: rf.byR[k], raw: k})).sort((x,y) => y.v - x.v);
+    const totalR = reasons.reduce((s,x) => s + x.v, 0);
+    const apparel = reasons.filter(x => x.raw.startsWith('APPAREL')).reduce((s,x) => s + x.v, 0);
+    const desc = (rf.byR['NOT_AS_DESCRIBED'] || 0) + (rf.byR['DEFECTIVE'] || 0) + (rf.byR['ITEM_DEFECT'] || 0) + (rf.byR['MISSING_PARTS'] || 0);
+    reasonRows = `<div class="sec"><div class="sec-h"><h2>退货原因 TOP8</h2><span class="hint">退货订单明细口径 · 共 ${numStr(totalR)} 件</span></div>
+      <div class="panel" style="padding:14px 18px">${hbarRows(reasons.slice(0, 8).map(x => ({lb: x.lb, v: x.v, c: (x.raw.startsWith('APPAREL') || x.raw === 'NOT_AS_DESCRIBED') ? '#B8423A' : '#1BA3B8'})))}</div>
+      <div class="dnote" style="margin-top:10px">${apparel ? `服装尺码类合计 <b>${numStr(apparel)}</b> 件（${pctStr(apparel/totalR*100)}）——节后退货潮属预期，重点是清库存回款；` : ''}${desc ? `描述不符/质量类 <b class="hl">${numStr(desc)}</b> 件（${pctStr(desc/totalR*100)}）——需核对 listing 与品控，这是可归因、可改善的部分。` : ''}</div></div>`;
+    if(rf.byStat){
+      statHtml = `<div class="sec"><div class="sec-h"><h2>退货去向</h2><span class="hint">回库存可再售仅损失佣金运费 · 清算/捐赠为沉没成本</span></div>
+        <div class="panel"><div class="chipstat">${Object.keys(rf.byStat).map(k => `<span class="${k.indexOf('inventory') >= 0 || k === 'SELLABLE' ? 'ok' : (k === 'Reimbursed' ? '' : 'warn')}">${esc(STAT_CN[k]||k)} <b>${numStr(rf.byStat[k])}</b></span>`).join('')}</div></div></div>`;
+    }
+    const retTopList = Object.keys(rf.byA).map(k => ({ai: Number(k), v: rf.byA[k]})).sort((x,y) => y.v - x.v).slice(0, 10);
+    retTop = `<div class="sec"><div class="sec-h"><h2>退货 TOP10 单品</h2><span class="hint">退货订单口径 · 退货/销量 &gt;40% 的进行动清单</span></div>
+      <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">退货量</th><th class="r">本月销量</th><th class="r">退货/销量</th><th class="r">净毛利</th></tr></thead><tbody>
+      ${retTopList.map(x => { const ra = skuAgg.find(z => z.ai === x.ai) || {a:{u:0,p:0}};
+        return `<tr class="rowbtn" data-v="dt" data-a="${x.ai}"><td class="tname">${esc(DB.names[x.ai].slice(0, 26))}</td><td class="asin">${DB.asins[x.ai]}</td>
+        <td class="r dn"><b>${numStr(x.v)}</b></td><td class="r">${numStr(ra.a.u)}</td>
+        <td class="r ${ra.a.u && x.v/ra.a.u > 0.4 ? 'dn' : ''}">${ra.a.u ? pctStr(x.v/ra.a.u*100) : '-'}</td>
+        <td class="r ${ra.a.p>=0?'up':'dn'}">${money(ra.a.p)}</td></tr>`; }).join('')}
+      </tbody></table></div></div>`;
+  }
+  $app.innerHTML = `
+    ${crumbHtml([{label:'专题监控', v:'gap'}, {label:'价格与售后', v:'rc'}])}
+    <div class="dnote">两个杠杆：<b>价格带净利率</b>（低客单带被 FBA 费吃穿是结构性问题，调价没用）+ <b>退款率</b>（超线先归因再上新）</div>
+    ${conclBox([
+      {k:'退款', tone: rLamp === 'g' ? 'g' : 'r', txt:`退款率 <b>${pctStr(refRate)}</b> ${lampHtml(rLamp)}（≤${THR.refundG}% 绿）· 退款 ${numStr(a.rf)} 件。${refRate > THR.refundG ? '<span class="hl">超线：该品类停止上新，先出退货归因</span>' : ''}`},
+      (() => { const bad = bands.filter(x => x.n >= 5 && x.gm < 0); return bad.length ? {k:'价格带', tone:'r', txt:`<b>${esc(bad.map(x => x.lb).join('、'))}</b> 价格带净利率为负——低客单被 FBA 费吃穿（FBA 占 ${pctStr(bad[0].fbaR)}），<span class="hl">组合装拉客单是第一杠杆</span>；红线：FBA+佣金 &gt; 售价×55% 不允许上新。`} : {k:'价格带', tone:'g', txt:'各价格带净利率均未出现整带亏损。'}; })()
+    ])}
+    <div class="sec"><div class="grid4">
+      ${kpiCard(rLamp === 'g' ? '' : 'warn', IC.refund, '退款率（杠杆）', pctStr(refRate), `退款 ${numStr(a.rf)} 件 / 销量 ${numStr(a.u)} 件 · ≤${THR.refundG}% 绿`)}
+      ${kpiCard('', IC.coin, '客单价', '$' + (a.ord ? a.s/a.ord : 0).toFixed(2), '拉客单 = 组合装/多件折扣')}
+      ${kpiCard(a.fba/a.s > 0.30 ? 'warn' : 'mid', IC.pct, 'FBA 费占销售额', pctStr(a.fba/Math.max(a.s,1)*100), '健康 ≤30% · 超线换小规格或提价')}
+      ${kpiCard('', IC.trend, '覆盖 ASIN', numStr(skuAgg.filter(x => x.sp).length), '有售价快照的单品参与价格带统计')}
+    </div></div>
+    <div class="sec"><div class="sec-h"><h2>价格带净利率</h2><span class="hint">整带亏损 = 结构性问题：动产品形态（组合装），不是调价</span></div>
+      <div class="panel"><table><thead><tr><th>价格带</th><th class="r">ASIN数</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净利率</th><th class="r">FBA占比</th><th>判定</th></tr></thead><tbody>
+      ${bands.filter(x => x.n).map(x => `<tr>
+        <td class="tname">${x.lb}</td><td class="r">${x.n}</td><td class="r">${numStr(x.u)}</td><td class="r">${money(x.s)}</td>
+        <td class="r ${x.p>=0?'up':'dn'}"><b>${money(x.p)}</b></td>
+        <td class="r ${gmCls(x.gm)}"><b>${pctStr(x.gm)}</b></td>
+        <td class="r">${pctStr(x.fbaR)}</td>
+        <td>${x.gm < 0 ? '<span class="lamp w">整带亏损</span>' : x.gm >= 8 ? '<span class="lamp g">健康</span>' : '<span class="lamp y">偏薄</span>'}</td></tr>`).join('')}
+      </tbody></table></div></div>
+    ${reasonRows}
+    ${statHtml}
+    ${retTop}`;
+}
+
+/* ================= 05 行动跟进：怎么补 · 补了吗 ================= */
+const LS_ACT = 'lfh_monthly_act', LS_TODO = 'lfh_monthly_todo';
+let ACTST = (function(){ try{ const r = localStorage.getItem(LS_ACT); if(r) return JSON.parse(r) || {}; }catch(e){} return {}; })();
+let TODOS = (function(){ try{ const r = localStorage.getItem(LS_TODO); if(r) return JSON.parse(r) || []; }catch(e){} return []; })();
+function saveActSt(){ try{ localStorage.setItem(LS_ACT, JSON.stringify(ACTST)); }catch(e){} }
+function saveTodos(){ try{ localStorage.setItem(LS_TODO, JSON.stringify(TODOS)); }catch(e){} }
+function actGrade(it){
+  if(it.best.amt >= 300 || it.best.tone === 'r') return 'P0';
+  if(it.best.amt >= 100) return 'P1';
+  return 'P2';
+}
+function vAct(){
+  $crumbV.textContent = '行动跟进';
+  const items = actionEngine(actRows());
+  items.forEach(it => { it.grade = actGrade(it); it.key = it.asin + '|' + it.best.t; it.state = (ACTST[it.key] || {}).st || 'open'; });
+  const cnt = {open:0, doing:0, done:0};
+  items.forEach(it => cnt[it.state]++);
+  const gradeCnt = {P0:0, P1:0, P2:0};
+  items.forEach(it => gradeCnt[it.grade]++);
+  const order = {P0:0, P1:1, P2:2}, stOrder = {open:0, doing:1, done:2};
+  const sorted = [...items].sort((x,y) => (order[x.grade] - order[y.grade]) || (stOrder[x.state] - stOrder[y.state]) || (y.best.amt - x.best.amt));
+
+  /* 止损层：经营亏损单品（p<0）的退出进度 */
+  const lossItems = [...groupBy(actRows(), F.a).values()]
+    .map(rs => ({ai: rs[0][F.a], a: agg(rs)})).filter(x => x.a.p < 0).sort((x,y) => x.a.p - y.a.p);
+  const lossDone = lossItems.filter(x => (ACTST[DB.asins[x.ai] + '|止损退出'] || {}).st === 'done').length;
+
+  const actRow = it => {
+    const gCls = it.grade === 'P0' ? 'w' : (it.grade === 'P1' ? 'y' : 'g');
+    const opts = [['open','未处理'],['doing','处理中'],['done','已闭环']].map(o =>
+      `<option value="${o[0]}"${it.state === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('');
+    return `<tr class="${it.state === 'done' ? 'actdone' : ''}">
+      <td><span class="lamp ${gCls}">${it.grade}</span></td>
+      <td><span class="actag ${it.best.tone}">${it.best.t}</span></td>
+      <td class="tname">${esc(it.nm.length > 22 ? it.nm.slice(0,22) + '…' : it.nm)}<br><span class="asin">${it.asin}</span></td>
+      <td>${it.best.ev}</td>
+      <td>${it.best.act}</td>
+      <td class="r ${it.best.tone === 'b' ? 'up' : 'dn'}"><b>${money(it.best.amt)}</b></td>
+      <td><select class="stsel" data-actkey="${esc(it.key)}">${opts}</select></td></tr>`;
+  };
+
+  $app.innerHTML = `
+    ${crumbHtml([{label:'行动跟进', v:'act'}])}
+    <div class="dnote">闭环最后一环：告警分级 → 处理状态 → 待办追踪。分析发现问题、月报定了动作，在这里追踪「做了没、有没有效」。状态保存在本浏览器。</div>
+    <div class="sec"><div class="grid4">
+      ${kpiCard(gradeCnt.P0 ? 'warn' : 'mid', IC.refund, 'P0 告警', numStr(gradeCnt.P0), `涉及金额 ≥$300 或止血类 · 当周必须处理`)}
+      ${kpiCard('mid', IC.trend, 'P1 / P2', numStr(gradeCnt.P1) + '<small>  / ' + numStr(gradeCnt.P2) + '</small>', 'P1 ≥$100 · P2 其余 · 排期处理')}
+      ${kpiCard(cnt.done ? '' : 'mid', IC.coin, '已闭环', numStr(cnt.done), `处理中 ${cnt.doing} · 未处理 ${cnt.open}`)}
+      ${kpiCard('mid', IC.pct, '止损名单', numStr(lossItems.length) + '<small>  个亏损 ASIN</small>', `已清完 ${lossDone} 个 · 合计 ${money(lossItems.reduce((s,x) => s + x.a.p, 0))}`)}
+    </div></div>
+    <div class="sec"><div class="sec-h"><h2>告警中心</h2><span class="hint">${items.length} 条触发规则 · P0 在前、同级别按涉及金额排序 · 切换状态即保存</span>
+      <button class="btn sm" id="btnCopyAct2" style="margin-left:auto">复制全部</button></div>
+      <div class="panel"><table><thead><tr><th>级别</th><th>类型</th><th>单品</th><th>依据</th><th>动作</th><th class="r">涉及金额</th><th>状态</th></tr></thead><tbody>
+      ${sorted.slice(0, 40).map(actRow).join('') || '<tr><td colspan="7" class="dnote">当前无触发行动规则的问题单品。</td></tr>'}
+      ${items.length > 40 ? `<tr><td colspan="7" class="dnote">仅展示前 40 / 共 ${items.length} 条——按 P0→P2 顺序处理</td></tr>` : ''}
+      </tbody></table></div></div>
+    <div class="sec"><div class="sec-h"><h2>待办清单</h2><span class="hint">动作 + 责任人 + 检查点 · 一周后能否对着打勾</span></div>
+      <div class="panel">
+        <table id="todoTbl"><thead><tr><th style="width:34px"></th><th>动作</th><th>责任人</th><th>检查点</th><th style="width:40px"></th></tr></thead><tbody>
+        ${TODOS.map((t, i) => `<tr class="${t.done ? 'actdone' : ''}">
+          <td><input type="checkbox" class="todochk" data-todoi="${i}"${t.done ? ' checked' : ''}></td>
+          <td class="tname">${esc(t.txt)}</td><td>${esc(t.owner || '我')}</td><td>${esc(t.due || '下周五')}</td>
+          <td><span class="rowbtn" data-tododel="${i}" style="color:var(--coral);cursor:pointer">删</span></td></tr>`).join('') || '<tr><td colspan="5" class="dnote">暂无待办——在告警清单处理关键项后，把"改主图/关投放/补货"等动作录入这里。</td></tr>'}
+        </tbody></table>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input id="todoTxt" placeholder="动作（如：关闭 ACOS>100% 投放并迁移预算）" style="flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px">
+          <input id="todoOwner" placeholder="责任人" style="width:90px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px">
+          <input id="todoDue" placeholder="检查点（如 11-20）" style="width:110px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px">
+          <button class="btn sm primary" id="todoAdd">加入</button>
+        </div>
+      </div></div>
+    <div class="sec"><div class="sec-h"><h2>止损退出进度</h2><span class="hint">亏损 ASIN 30 天退出计划：第1周停投 → 第2-3周降价清仓 → 第4周移除 · 不允许"再观察一个月"</span></div>
+      <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">净亏</th><th class="r">净毛利率</th><th class="r">本月销量</th><th>退出进度</th><th>状态</th></tr></thead><tbody>
+      ${lossItems.slice(0, 20).map(x => {
+        const key = DB.asins[x.ai] + '|止损退出';
+        const stt = (ACTST[key] || {}).st || 'open';
+        const opts = [['open','未启动'],['doing','退出中'],['done','已清完']].map(o => `<option value="${o[0]}"${stt === o[0] ? ' selected' : ''}>${o[1]}</option>`).join('');
+        return `<tr><td class="tname">${esc(DB.names[x.ai].slice(0, 24))}</td><td class="asin">${DB.asins[x.ai]}</td>
+        <td class="r dn"><b>${money(x.a.p)}</b></td><td class="r dn">${pctStr(x.a.gm)}</td><td class="r">${numStr(x.a.u)}</td>
+        <td>${x.a.u > 0 ? '仍在售：先停广告' : '已停售：降价清仓 → 移除'}</td>
+        <td><select class="stsel" data-actkey="${esc(key)}" data-actasin="${x.ai}">${opts}</select></td></tr>`; }).join('') || '<tr><td colspan="7" class="dnote">无亏损 ASIN</td></tr>'}
+      ${lossItems.length > 20 ? `<tr><td colspan="7" class="dnote">仅前 20 / 共 ${lossItems.length} 个（按亏损额排序）</td></tr>` : ''}
+      </tbody></table>
+      <div class="dnote" style="margin-top:8px">上月止损名单 → 本月退出进度 → 剩余未退出原因：每月报告必须汇报这三项（06 日/周/月报页）。</div></div></div>`;
+  bindCopyAct(items, 40);
+  /* 复制全部按钮（告警中心专用） */
+  const btn2 = document.getElementById('btnCopyAct2');
+  if(btn2) btn2.onclick = () => {
+    const lines = sorted.map((x,i) => `${i+1}.[${x.grade}]【${x.best.t}】${x.nm}（${x.asin}）${x.best.ev} → ${x.best.act}（涉及 ${money(x.best.amt)}）`);
+    const txt = '告警清单（' + DB.days[0] + '~' + DB.days[DB.days.length-1] + '）\n' + lines.join('\n');
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => toast('已复制 ' + lines.length + ' 条'))
+      .catch(() => { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('已复制'); });
+  };
+  /* 状态切换持久化 */
+  $app.querySelectorAll('select.stsel').forEach(sel => {
+    sel.onchange = () => {
+      ACTST[sel.dataset.actkey] = {st: sel.value, t: Date.now()};
+      saveActSt();
+      toast('已保存状态：' + sel.value);
+    };
+  });
+  /* 待办增删 */
+  const addBtn = document.getElementById('todoAdd');
+  if(addBtn) addBtn.onclick = () => {
+    const txt = document.getElementById('todoTxt').value.trim();
+    if(!txt){ toast('先写动作内容'); return; }
+    TODOS.push({txt, owner: document.getElementById('todoOwner').value.trim() || '我', due: document.getElementById('todoDue').value.trim() || '下周五', done: false});
+    saveTodos(); vAct();
+  };
+  $app.querySelectorAll('.todochk').forEach(chk => {
+    chk.onchange = () => { TODOS[Number(chk.dataset.todoi)].done = chk.checked; saveTodos(); vAct(); };
+  });
+  $app.querySelectorAll('[data-tododel]').forEach(el => {
+    el.onclick = () => { TODOS.splice(Number(el.dataset.tododel), 1); saveTodos(); vAct(); };
+  });
+}
+
 /* ================= 视图：数据管理 ================= */
 function vData(){
   $crumbV.textContent = '数据管理';
@@ -1146,6 +1712,41 @@ function vData(){
         <div class="dnote" style="margin-top:10px">已排除 <b>${EXCL.length}</b> 个品类。适用场景：不再运营的品类（如停售的硅胶手环）、试卖后放弃的品类——它们的数据不应再稀释你的达成率。随时取消勾选恢复。</div>
       </div>
     </div>
+    <div class="sec"><div class="sec-h"><h2>口径字典 · 唯一权威解释源</h2><span class="hint">同一指标多处出现时以此为准 · 冻结口径再谈可视化</span></div>
+      <div class="panel"><table><thead><tr><th>指标</th><th>口径（冻结）</th><th>数据来源</th><th>用于</th></tr></thead><tbody>
+        <tr><td class="tname">净毛利 / 净毛利率</td><td>积加「销售净毛利」原生口径（含售后）· 毛利率 = 净毛利 ÷ 销售额</td><td>按日明细</td><td>目标考核 · 全站</td></tr>
+        <tr><td class="tname">经营毛利</td><td>净毛利 + 售后负担（估算）——不含退货/跨期退款，反映卖货能力</td><td>02 目标与差异</td><td>利润质量归因</td></tr>
+        <tr><td class="tname">售后负担</td><td>退货订单件数 × 售价（上界估算，未扣回库再售回收）</td><td>退货订单表</td><td>2.3 利润树</td></tr>
+        <tr><td class="tname">退款率</td><td>按日表退款量 ÷ 销量（宽口径，含退款未退货）——只做指标，不做归因</td><td>按日明细</td><td>04 价格与售后</td></tr>
+        <tr><td class="tname">退货量</td><td>退货订单表逐单计数——只做归因（原因/去向），不与退款率相加</td><td>退货订单表</td><td>04 价格与售后</td></tr>
+        <tr><td class="tname">TACOS</td><td>广告花费 ÷ 总销售额（不是 ÷ 广告销售额）</td><td>按日明细</td><td>04 广告 · 杠杆</td></tr>
+        <tr><td class="tname">ACOS</td><td>广告花费 ÷ 广告销售额</td><td>按日明细</td><td>投放级效率</td></tr>
+        <tr><td class="tname">CVR</td><td>订单量 ÷ Sessions（本店无品牌旗舰口径差异）</td><td>按日明细</td><td>04 流量转化 · 杠杆</td></tr>
+        <tr><td class="tname">月内增速</td><td>近 7 日日均 ÷ 此前日均 − 1（无上月数据时以月内节奏近似环比）</td><td>按日明细</td><td>四象限 · 分层</td></tr>
+        <tr><td class="tname">微量行折叠</td><td>月销量 &lt; ${MIN_U} 件的品类/父体/单品不占排行版面（小样本失真）</td><td>全站规则</td><td>排行页</td></tr>
+        <tr><td class="tname">P0/P1/P2</td><td>P0 = 涉及金额 ≥$300 或止血类 · P1 ≥$100 · P2 其余</td><td>行动引擎</td><td>05 行动跟进</td></tr>
+      </tbody></table></div></div>
+    <div class="sec"><div class="sec-h"><h2>阈值配置 · 红黄绿灯</h2><span class="hint">每季度用滚动 90 天数据复核 · 保存后全站生效</span></div>
+      <div class="panel">
+        <div class="form-grid" style="grid-template-columns:repeat(4,1fr)">
+          <div class="field"><label>CVR 绿线 ≥（%）</label><input type="number" id="th-cvrG" value="${THR.cvrG}" step="0.5"></div>
+          <div class="field"><label>CVR 黄线 ≥（%）</label><input type="number" id="th-cvrY" value="${THR.cvrY}" step="0.5"></div>
+          <div class="field"><label>TACOS 绿线 ≤（%）</label><input type="number" id="th-tacosG" value="${THR.tacosG}" step="0.5"></div>
+          <div class="field"><label>TACOS 黄线 ≤（%）</label><input type="number" id="th-tacosY" value="${THR.tacosY}" step="0.5"></div>
+          <div class="field"><label>退款率绿线 ≤（%）</label><input type="number" id="th-refundG" value="${THR.refundG}" step="0.5"></div>
+          <div class="field"><label>可售天数下限（天）</label><input type="number" id="th-sdMin" value="${THR.sdMin}"></div>
+          <div class="field"><label>可售天数上限（天）</label><input type="number" id="th-sdMax" value="${THR.sdMax}"></div>
+          <div class="field"><label>滞销占比绿线 ≤（%）</label><input type="number" id="th-idlePct" value="${THR.idlePct}" step="0.5"></div>
+          <div class="field"><label>广告依赖红线 ≥（%）</label><input type="number" id="th-depN" value="${THR.depN}" step="1"></div>
+          <div class="field"><label>零转化 Sessions ≥</label><input type="number" id="th-sesN" value="${THR.sesN}" step="10"></div>
+          <div class="field"><label>微量行折叠 &lt;（件/月）</label><input type="number" id="th-minU" value="${THR.minU}" step="1"></div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:10px">
+          <button class="btn primary" id="btnThr">保存阈值</button>
+          <button class="btn" id="btnThrReset">恢复默认</button>
+        </div>
+        <div class="dnote" style="margin-top:10px">护栏裁决规则：<b>销量目标永远让位于护栏</b>——宁可下调目标，不允许突破护栏冲量（0-5 美元价格带整带亏损就是反例）。</div>
+      </div></div>
     <div class="sec"><div class="sec-h"><h2>维护</h2></div>
       <div class="panel" style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn" id="btnExport">导出当前数据 JSON</button>
@@ -1181,6 +1782,22 @@ function vData(){
       };
     });
     if(saveTgt()) toast('目标已保存');
+  };
+  /* 阈值配置 */
+  document.getElementById('btnThr').onclick = () => {
+    ['cvrG','cvrY','tacosG','tacosY','refundG','sdMin','sdMax','idlePct','depN','sesN','minU'].forEach(k => {
+      const v = Number(document.getElementById('th-' + k).value);
+      if(!isNaN(v) && v > 0) THR[k] = v;
+    });
+    MIN_U = THR.minU;
+    if(saveThr()) toast('阈值已保存 · 全站生效');
+  };
+  document.getElementById('btnThrReset').onclick = () => {
+    THR = Object.assign({}, TH_DEF);
+    MIN_U = THR.minU;
+    saveThr();
+    vData();
+    toast('已恢复默认阈值');
   };
   document.getElementById('btnExport').onclick = () => {
     const blob = new Blob([JSON.stringify(DB)], {type:'application/json'});
@@ -1513,12 +2130,18 @@ function vRep(){
 function render(){
   const q = parseHash();
   const v = q.v || 'ov';
-  /* 店铺维度只在「店铺」页；品类/父体/单品/数据均为整店口径，只拆自己的维度 */
+  /* 店铺维度只在「店铺对比」页；品类/父体/单品均为整店口径，只拆自己的维度 */
   if(v === 'st') vStore(Number(q.st) || 0);
   else if(v === 'cat') vCatPage();
   else if(v === 'pt') vParentPage(q.c);
-  else if(v === 'sku') vSkuPage(q.pa);
+  else if(v === 'sku') vSkuPage(q.pa, q.ly);
   else if(v === 'dt') vDetail(q.a);
+  else if(v === 'gap') vGap();
+  else if(v === 'tf') vTf();
+  else if(v === 'adw') vAdw();
+  else if(v === 'inv') vInv();
+  else if(v === 'rc') vRc();
+  else if(v === 'act') vAct();
   else if(v === 'data') vData();
   else if(v === 'rep') vRep();
   else vOv();
