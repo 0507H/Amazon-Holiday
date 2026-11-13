@@ -273,6 +273,8 @@ function groupBy(rows, keyIdx){
 }
 /* 行字段索引 */
 const F = {d:0,st:1,cat:2,pa:3,a:4,u:5,s:6,p:7,rf:8,ad:9,ads:10,rev:11,exp:12,pur:13,fba:14,comm:15,cpn:16,ord:17,ses:18};
+/* 微量行：月销量 < 10 件不占排行版面——小样本下净毛利与毛利率严重失真（卖1件就可能 ±120%），没有统计意义 */
+const MIN_U = 10;
 
 /* ================= 格式化 ================= */
 function money(v, dec){
@@ -806,29 +808,33 @@ function vCatPage(){
     asinsC.forEach(ai => { const sp = sumOf(ai); if(sp){ iv += sp.iv; if(sp.kt > 0){ ktSum += sp.kt; ktN++; } } });
     return {ci, a: aC, iv, kt: ktN ? ktSum/ktN : 0, n: asinsC.length};
   }).sort((x,y) => y.a.p - x.a.p);
-  const maxP = Math.max(...catList.map(x => Math.abs(x.a.p)), 1);
-  const worstC = [...catList].sort((x,y) => x.a.p - y.a.p)[0];
-  const top3Share = a.s > 0 ? catList.slice(0, 3).reduce((s,x) => s + x.a.s, 0) / a.s * 100 : 0;
-  const lossCats = catList.filter(x => x.a.p < 0);
-  const lossSum = lossCats.reduce((s,x) => s + x.a.p, 0);
-  const totalIv = catList.reduce((s,x) => s + x.iv, 0);
-  /* 零销量品类不占版面（合计不受影响，它们销量本就是 0） */
+  /* 零销量与微量品类不占版面（合计行仍为全量口径）：月销量<10件的品类毛利百分严重失真 */
   const zeroCats = catList.filter(x => x.a.u === 0);
   const showCats = catList.filter(x => x.a.u > 0);
-  /* 止血结论：最差品类 + 品类内亏损王单品（指名道姓） */
+  const lowCats = showCats.filter(x => x.a.u < MIN_U);
+  const dispCats = showCats.filter(x => x.a.u >= MIN_U);
+  const statsCats = dispCats.length ? dispCats : showCats; /* 极端情况下全店都微量时退回有销量口径 */
+  const lowSum = {u: lowCats.reduce((s,x) => s + x.a.u, 0), s: lowCats.reduce((s,x) => s + x.a.s, 0), p: lowCats.reduce((s,x) => s + x.a.p, 0)};
+  /* 止血结论：最差品类 + 品类内亏损王单品（指名道姓，只看有统计意义的品类） */
+  const worstC = [...statsCats].sort((x,y) => x.a.p - y.a.p)[0];
   let stopTxt = '无净亏损品类，按毛利贡献排优先级投放资源。';
   if(worstC && worstC.a.p < 0){
     const cRows = rows.filter(r => r[F.cat] === worstC.ci);
     const worstSku = [...groupBy(cRows, F.a).values()].map(rs => ({ai: rs[0][F.a], a: agg(rs)})).sort((x,y) => x.a.p - y.a.p)[0];
     stopTxt = `最差品类【${esc(DB.cats[worstC.ci])}】净亏 <b class="hl">${money(worstC.a.p)}</b> · 滞销占压 ${money(worstC.iv)} —— 主要来自【${esc(DB.names[worstSku.ai].slice(0,18))}】（${DB.asins[worstSku.ai]}，亏 ${money(worstSku.a.p)}）：先停广告，两周无起色清仓。`;
   }
-  /* 头部品类依赖：TOP1 品类的销售额与毛利占比 */
-  const top1 = showCats[0];
-  const gmTop = [...showCats].sort((x,y) => y.a.gm - x.a.gm)[0];
-  const gmLow = [...showCats].sort((x,y) => x.a.gm - y.a.gm)[0];
+  /* 头部品类依赖：TOP1 品类的销售额与毛利占比（微量品类不参与结论） */
+  const maxP = Math.max(...catList.map(x => Math.abs(x.a.p)), 1);
+  const top3Share = a.s > 0 ? catList.slice(0, 3).reduce((s,x) => s + x.a.s, 0) / a.s * 100 : 0;
+  const lossCats = statsCats.filter(x => x.a.p < 0);
+  const lossSum = lossCats.reduce((s,x) => s + x.a.p, 0);
+  const totalIv = catList.reduce((s,x) => s + x.iv, 0);
+  const top1 = statsCats[0];
+  const gmTop = [...statsCats].sort((x,y) => y.a.gm - x.a.gm)[0];
+  const gmLow = [...statsCats].sort((x,y) => x.a.gm - y.a.gm)[0];
   const conclCat = conclBox([
     {k:'集中', tone:'f', txt:`TOP3 品类占整店销售额 <b>${pctStr(top3Share)}</b>${top3Share > 60 ? '，<span class="hl">头部品类的流量与库存波动直接决定大盘，优先保供与稳广告</span>' : '，结构分散度可接受'}。`},
-    (top1 ? {k:'头部', tone:'f', txt:`头部品类【${esc(DB.cats[top1.ci])}】销售额 ${money(top1.a.s)}（占 <b>${pctStr(top1.a.s/Math.max(a.s,1)*100)}</b>）· 净毛利 ${money(top1.a.p)}（占 ${pctStr(top1.a.p/Math.max(a.p,1)*100)}）${top1.a.s/a.s > 0.4 ? ' —— <span class="hl">单一品类依赖偏高，其断货/差评将直接冲击整店，优先盯库存与评分</span>' : ''}。`} : null),
+    (top1 ? {k:'头部', tone:'f', txt:`头部品类【${esc(DB.cats[top1.ci])}】销售额 ${money(top1.a.s)}（占 <b>${pctStr(top1.a.s/Math.max(a.s,1)*100)}</b>）· 净毛利 ${money(top1.a.p)}${a.p > top1.a.p * 0.5 ? '（占 ' + pctStr(top1.a.p/Math.max(a.p,1)*100) + '）' : '，<span class="hl">整店净毛利（' + money(a.p) + '）被亏损品类大幅抵消——先处置亏损品类，头部赚的被亏的吃掉了</span>'}${top1.a.s/a.s > 0.4 ? ' —— <span class="hl">单一品类依赖偏高，其断货/差评将直接冲击整店，优先盯库存与评分</span>' : ''}。`} : null),
     {k:'效率', tone:'f', txt: gmTop && gmLow && gmTop.ci !== gmLow.ci ? `毛利率最高【${esc(DB.cats[gmTop.ci])}】${pctStr(gmTop.a.gm)} vs 最低【${esc(DB.cats[gmLow.ci])}】${pctStr(gmLow.a.gm)} —— 广告预算向高毛利品类倾斜，低毛利品类控投放。` : '品类间毛利率差异不大。'},
     {k:'止血', tone: worstC && worstC.a.p < 0 ? 'r' : 'g', txt: stopTxt}
   ].filter(Boolean));
@@ -836,11 +842,11 @@ function vCatPage(){
   /* 分布图（同口径三张：单品数 / 销售额 / 净毛利率） */
   const distChart = (title, hint, data, fmt) =>
     `<div class="panel" style="padding:14px 18px"><div style="font-size:12px;color:var(--sub);margin-bottom:8px">${title}<span style="color:var(--faint)"> · ${hint}</span></div>${hbarRows(data, fmt)}</div>`;
-  const chartGrid = `<div class="sec"><div class="sec-h"><h2>品类分布</h2><span class="hint">仅统计有销量品类 · 整店口径</span></div>
+  const chartGrid = `<div class="sec"><div class="sec-h"><h2>品类分布</h2><span class="hint">月销量 ≥ ${MIN_U} 件的有统计意义品类 · 整店口径</span></div>
     <div class="grid3">
-      ${distChart('单品数分布', '结构是否过度集中于单一品类', showCats.map(x => ({lb: DB.cats[x.ci], v: x.n, c:'#8FA4B4'})))}
-      ${distChart('销售额分布', '钱从哪些品类来', showCats.map(x => ({lb: DB.cats[x.ci], v: x.a.s, c:'#1BA3B8', fmt: money})))}
-      ${distChart('净毛利率对比', '高于整店均值 ${pctStr(a.gm)} 为绿色', showCats.map(x => ({lb: DB.cats[x.ci], v: Math.max(x.a.gm, 0), c: x.a.gm >= a.gm ? 'var(--teal)' : 'var(--coral)', fmt: v => pctStr(x.a.gm)})))}
+      ${distChart('单品数分布', '结构是否过度集中于单一品类', statsCats.map(x => ({lb: DB.cats[x.ci], v: x.n, c:'#8FA4B4'})))}
+      ${distChart('销售额分布', '钱从哪些品类来', statsCats.map(x => ({lb: DB.cats[x.ci], v: x.a.s, c:'#1BA3B8', fmt: money})))}
+      ${distChart('净毛利率对比', '高于整店均值 ${pctStr(a.gm)} 为绿色', statsCats.map(x => ({lb: DB.cats[x.ci], v: Math.max(x.a.gm, 0), c: x.a.gm >= a.gm ? 'var(--teal)' : 'var(--coral)', fmt: v => pctStr(x.a.gm)})))}
     </div></div>`;
 
   $app.innerHTML = `
@@ -849,15 +855,15 @@ function vCatPage(){
     ${conclCat}
     <div class="sec"><div class="sec-h"><h2>品类关键指标</h2><span class="hint">实际 ${DB.days[0]}~${DB.days[DB.days.length-1]}</span></div>
       <div class="grid4">
-        ${kpiCard('', IC.trend, '有销量品类', `${showCats.length}<small>  / ${catList.length} 个</small>`, `${EXCL.length ? `另有 ${EXCL.length} 个已标记不做已剔除 · ` : ''}零销量 ${zeroCats.length} 个已折叠`)}
+        ${kpiCard('', IC.trend, '主力品类', `${dispCats.length}<small>  / ${catList.length} 个</small>`, `月销量 ≥ ${MIN_U} 件的品类 · 零销量 ${zeroCats.length} + 微量 ${lowCats.length} 个已折叠${EXCL.length ? ' · 另有 ' + EXCL.length + ' 个已标记不做' : ''}`)}
         ${kpiCard(top3Share > 60 ? 'warn' : 'mid', IC.trend, 'TOP3 集中度', pctStr(top3Share), top3Share > 60 ? '头部依赖偏高，优先保供与稳广告' : '结构分散度可接受')}
         ${kpiCard(lossCats.length ? 'warn' : 'mid', IC.coin, '亏损品类', `${lossCats.length}<small>  个 · 合计 ${money(lossSum)}</small>`, lossCats.length ? `最差【${esc(worstC ? DB.cats[worstC.ci] : '')}】${worstC ? money(worstC.a.p) : ''} · 处置见结论` : '无净亏损品类')}
         ${kpiCard(totalIv > 0 ? 'warn' : 'mid', IC.pct, '滞销占压', money(totalIv), '全部品类滞销货值合计（汇总快照）')}
       </div></div>
     ${chartGrid}
-    <div class="sec"><div class="sec-h"><h2>品类排行</h2><span class="hint">按净毛利排序 · 滞销/库周转来自汇总快照 · 点击进入父体层</span></div>
+    <div class="sec"><div class="sec-h"><h2>品类排行</h2><span class="hint">按净毛利排序 · 仅月销量 ≥ ${MIN_U} 件的品类 · 点击进入父体层</span></div>
       <div class="panel"><table><thead><tr><th>品类</th><th class="r">单品数</th><th class="r">销量</th><th class="r">日均</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th class="r">滞销货值</th><th class="r">库周转(均)</th><th>毛利贡献</th></tr></thead><tbody>
-      ${showCats.map(x => `<tr class="rowbtn" data-v="pt" data-c="${x.ci}">
+      ${dispCats.map(x => `<tr class="rowbtn" data-v="pt" data-c="${x.ci}">
         <td class="tname">${esc(DB.cats[x.ci])}</td>
         <td class="r">${x.n}</td>
         <td class="r">${numStr(x.a.u)}</td>
@@ -870,7 +876,7 @@ function vCatPage(){
         <td>${barCell(x.a.p, maxP)}</td></tr>`).join('')}
       <tr class="tot"><td class="tname">合计</td><td class="r">${catList.reduce((s,x) => s+x.n, 0)}</td><td class="r">${numStr(a.u)}</td><td class="r">${numStr(a.u/DB.days.length)}</td><td class="r">${money(a.s)}</td><td class="r ${a.p>=0?'up':'dn'}">${money(a.p)}</td><td class="r gm ${gmCls(a.gm)}">${pctStr(a.gm)}</td><td class="r">${money(totalIv)}</td><td class="r">-</td><td></td></tr>
       </tbody></table>
-      ${zeroCats.length ? `<div class="dnote" style="margin-top:8px">已折叠 ${zeroCats.length} 个零销量品类（${zeroCats.slice(0,4).map(x => esc(DB.cats[x.ci])).join('、')}${zeroCats.length > 4 ? ' 等' : ''}）——不产生销量与利润，只积压库存；需要清仓的看滞销货值列或数据管理页。</div>` : ''}
+      ${(zeroCats.length || lowCats.length) ? `<div class="dnote" style="margin-top:8px">已折叠 <b>${zeroCats.length}</b> 个零销量 + <b>${lowCats.length}</b> 个月销量 &lt; ${MIN_U} 件的微量品类（合计 ${numStr(lowSum.u)} 件 / ${money(lowSum.s)} / 净毛利 ${money(lowSum.p)}）——数据量太小，毛利与毛利率在小样本下严重失真（卖 1 件就可能显示 ±100%+），没有统计指导意义，不占排行版面；其中滞销占压的看数据管理页清仓，真实亏损问题单品仍会被「行动清单」点名。</div>` : ''}
       ${EXCL.length ? `<div class="dnote" style="margin-top:6px">另有 <b>${EXCL.length}</b> 个品类已标记「不做」并从全部统计中剔除（数据管理页可恢复）。</div>` : ''}
       </div></div>`;
 }
@@ -892,7 +898,12 @@ function vParentPage(c){
   }).sort((x,y) => y.pa.p - x.pa.p);
   const aP = agg(rows);
   const maxP = Math.max(...pars.map(x => Math.abs(x.pa.p)), 1);
-  const worstP = [...pars].sort((x,y) => x.pa.p - y.pa.p)[0];
+  /* 微量父体不占版面：月销量<10件的小样本毛利失真 */
+  const lowPars = pars.filter(x => x.pa.u < MIN_U);
+  const dispPars = pars.filter(x => x.pa.u >= MIN_U);
+  const statsPars = dispPars.length ? dispPars : pars;
+  const lowSumP = {u: lowPars.reduce((s,x) => s + x.pa.u, 0), s: lowPars.reduce((s,x) => s + x.pa.s, 0), p: lowPars.reduce((s,x) => s + x.pa.p, 0)};
+  const worstP = [...statsPars].sort((x,y) => x.pa.p - y.pa.p)[0];
   const top5Share = aP.s > 0 ? pars.slice(0, 5).reduce((s,x) => s + x.pa.s, 0) / aP.s * 100 : 0;
   /* 止血结论：最差父体 + 父体内亏损王单品 */
   let stopTxtP = '无净亏损父体。';
@@ -917,15 +928,17 @@ function vParentPage(c){
     </div>
     ${conclPt}
     <div class="dnote" style="margin-top:8px">整店口径${catSel !== 'all' ? ' · 已筛选品类【' + esc(DB.cats[catSel]) + '】' : ''} · 父产品名称为"-"的按 父ASIN→ASIN 兜底归组 · 点击父体行进入单品层</div>
-    <div class="sec"><div class="sec-h"><h2>父体排行</h2><span class="hint">按净毛利排序 · 共 ${pars.length} 个父体</span></div>
+    <div class="sec"><div class="sec-h"><h2>父体排行</h2><span class="hint">按净毛利排序 · 月销量 ≥ ${MIN_U} 件共 ${dispPars.length} 个父体（另有 ${lowPars.length} 个微量父体已折叠）</span></div>
       <div class="panel"><table><thead><tr><th>父体（代表单品）</th><th>父ASIN</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
-      ${pars.map(x => `<tr class="rowbtn" data-v="sku" data-pa="${x.pi}">
+      ${dispPars.map(x => `<tr class="rowbtn" data-v="sku" data-pa="${x.pi}">
         <td class="tname">${esc(x.rep)}</td><td class="asin">${esc(DB.parents[x.pi])}</td>
         <td class="r">${numStr(x.pa.u)}</td><td class="r">${money(x.pa.s)}</td>
         <td class="r ${x.pa.p>=0?'up':'dn'}">${money(x.pa.p)}</td>
         <td class="r gm ${gmCls(x.pa.gm)}">${pctStr(x.pa.gm)}</td>
         <td>${barCell(x.pa.p, maxP)}</td></tr>`).join('')}
-      </tbody></table></div></div>`;
+      </tbody></table>
+      ${lowPars.length ? `<div class="dnote" style="margin-top:8px">已折叠 <b>${lowPars.length}</b> 个月销量 &lt; ${MIN_U} 件的微量父体（合计 ${numStr(lowSumP.u)} 件 / ${money(lowSumP.s)} / 净毛利 ${money(lowSumP.p)}）——小样本下毛利与毛利率严重失真，没有统计指导意义；真实亏损问题单品仍会被「行动清单」点名。</div>` : ''}
+      </div></div>`;
 }
 
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -944,7 +957,12 @@ function vSkuPage(pa){
     .map(o => ({v: o.pi, lb: repNameOf(allRows, o.pi).slice(0, 22) + ' · ' + DB.parents[o.pi]}));
   const skus = [...groupBy(rows, F.a).entries()].map(([ai, rs]) => ({ai, a: agg(rs)})).sort((x,y) => y.a.p - x.a.p);
   const maxP = Math.max(...skus.map(x => Math.abs(x.a.p)), 1);
-  const worstSku = skus[skus.length - 1];
+  /* 微量单品不占版面：月销量<10件的小样本毛利失真 */
+  const lowSkus = skus.filter(x => x.a.u < MIN_U);
+  const dispSkus = skus.filter(x => x.a.u >= MIN_U);
+  const statsSkus = dispSkus.length ? dispSkus : skus;
+  const lowSumS = {u: lowSkus.reduce((s,x) => s + x.a.u, 0), s: lowSkus.reduce((s,x) => s + x.a.s, 0), p: lowSkus.reduce((s,x) => s + x.a.p, 0)};
+  const worstSku = statsSkus[statsSkus.length - 1];
   const conclSku = conclBox([
     {k:'止血', tone: worstSku && worstSku.a.p < 0 ? 'r' : 'g', txt: worstSku && worstSku.a.p < 0
       ? `亏损最重的单品【${esc(DB.names[worstSku.ai].slice(0,18))}】（${DB.asins[worstSku.ai]}）净亏 <b class="hl">${money(worstSku.a.p)}</b> · 毛利率 ${pctStr(worstSku.a.gm)} —— 优先处置（停广告→核成本→清仓）。`
@@ -958,16 +976,18 @@ function vSkuPage(pa){
       ${selHtml('sku', 'pa', '全部父体', paOpts, paSel)}
     </div>
     ${conclSku}
-    <div class="dnote" style="margin-top:8px">整店口径 · 共 ${skus.length} 个单品 · 点击单品行进入数据页（按日明细逐字段）</div>
-    <div class="sec"><div class="sec-h"><h2>单品排行</h2><span class="hint">按净毛利排序</span></div>
+    <div class="dnote" style="margin-top:8px">整店口径 · 月销量 ≥ ${MIN_U} 件共 ${dispSkus.length} 个单品（另有 ${lowSkus.length} 个微量单品已折叠） · 点击单品行进入数据页（按日明细逐字段）</div>
+    <div class="sec"><div class="sec-h"><h2>单品排行</h2><span class="hint">按净毛利排序 · 仅月销量 ≥ ${MIN_U} 件的单品</span></div>
       <div class="panel"><table><thead><tr><th>单品</th><th>ASIN</th><th class="r">销量</th><th class="r">销售额</th><th class="r">净毛利</th><th class="r">净毛利率</th><th>毛利贡献</th></tr></thead><tbody>
-      ${skus.map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}">
+      ${dispSkus.map(x => `<tr class="rowbtn" data-v="dt" data-a="${x.ai}">
         <td class="tname">${esc(DB.names[x.ai])}</td><td class="asin">${DB.asins[x.ai]}</td>
         <td class="r">${numStr(x.a.u)}</td><td class="r">${money(x.a.s)}</td>
         <td class="r ${x.a.p>=0?'up':'dn'}">${money(x.a.p)}</td>
         <td class="r gm ${gmCls(x.a.gm)}">${pctStr(x.a.gm)}</td>
         <td>${barCell(x.a.p, maxP)}</td></tr>`).join('')}
-      </tbody></table></div></div>`;
+      </tbody></table>
+      ${lowSkus.length ? `<div class="dnote" style="margin-top:8px">已折叠 <b>${lowSkus.length}</b> 个月销量 &lt; ${MIN_U} 件的微量单品（合计 ${numStr(lowSumS.u)} 件 / ${money(lowSumS.s)} / 净毛利 ${money(lowSumS.p)}）——小样本下毛利与毛利率严重失真，没有统计指导意义；真实亏损问题单品仍会被「行动清单」点名。</div>` : ''}
+      </div></div>`;
 }
 
 /* 数据层面：单 ASIN 按日明细逐字段（整店口径） */
