@@ -239,15 +239,20 @@ function assignTypes(images){
   ensureUniqueManual(images);
 }
 
-// ========== 单ASIN逻辑 ==========
-let singleImages = [];
-const singleLog = document.getElementById('singleLog');
+// ========== 单ASIN逻辑（页面已移除；保留 slog 供日志组件使用，其余包进存在性守卫） ==========
 function slog(msg){
   if(!singleLog) return;
   const t = new Date().toLocaleTimeString();
   singleLog.innerHTML += `[${t}] ${msg}\n`;
   singleLog.scrollTop = singleLog.scrollHeight;
 }
+const singleLog = document.getElementById('singleLog');
+
+/* 单ASIN模块：仅当页面存在 page-single 时启用（当前 HTML 已移除该页） */
+if(document.getElementById('page-single')){
+let singleImages = [];
+// ========== 单ASIN逻辑 ==========
+
 
 const singleUploadArea = document.getElementById('singleUploadArea');
 const singleFileInput = document.getElementById('singleFileInput');
@@ -405,6 +410,7 @@ document.getElementById('singleExport').onclick = ()=>{
   XLSX.writeFile(wb, `${asin||'单ASIN'}_图片映射表.xlsx`);
   slog('📄 导出对照表成功');
 }
+}
 
 // ========== 多ASIN逻辑 ==========
 let groupList = [];
@@ -461,17 +467,18 @@ const multiDropArea = document.getElementById('multiDropArea');
 multiDropArea.onclick = ()=>multiFolderInput.click();
 multiDropArea.ondragover = e=>{
   e.preventDefault();
+  e.stopPropagation();
   multiDropArea.classList.add('active');
 };
 multiDropArea.ondragleave = ()=>multiDropArea.classList.remove('active');
-multiDropArea.ondrop = async e=>{
+async function handleMultiDrop(e){
   e.preventDefault();
   multiDropArea.classList.remove('active');
-  
+
   const items = e.dataTransfer.items;
   const entryList = [];
 
-  // 同步收集所有条目
+  // 同步收集所有条目（必须在 await 之前）
   for(let i=0;i<items.length;i++){
     const entry = items[i].webkitGetAsEntry();
     if(entry){
@@ -504,6 +511,18 @@ multiDropArea.ondrop = async e=>{
   mlog(`✅ 拖拽完成，识别 ${dirCount} 个文件夹，共 ${multiTotal} 张图片`);
   renderGroups();
 }
+multiDropArea.ondrop = handleMultiDrop;
+
+/* 全局拖拽保护：拦截散落在页面其他位置的拖拽——不拦截的话浏览器会直接打开拖入的
+   文件/文件夹，整个工具页被替换（在门户 iframe 中表现为工具"打不开"） */
+['dragover','dragenter'].forEach(ev => window.addEventListener(ev, e=>e.preventDefault()));
+window.addEventListener('drop', e=>{
+  e.preventDefault();
+  const path = e.composedPath ? e.composedPath() : [];
+  if(path.includes(multiDropArea) || path.includes(singleUploadArea)) return; // 区域内已由各自处理器处理
+  mlog('📥 检测到拖入（区域外），已按批量文件夹处理');
+  handleMultiDrop(e);
+});
 
 // 点击选择文件夹
 const multiClickInput = document.getElementById('multiClickInput');
@@ -938,7 +957,6 @@ document.getElementById('searchSku').oninput = e=>{
   });
 }
 
-slog('✅ 单ASIN模式就绪');
 mlog('✅ 多ASIN模式就绪：选中多个文件夹一起拖拽到左侧区域，即可批量分组');
 
 })();

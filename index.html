@@ -585,6 +585,11 @@ document.querySelectorAll('.q-item').forEach(q => {
 $('moreTodo').addEventListener('click', () => openTool('tasks'));
 $('btnNew').addEventListener('click', () => openTool('tasks'));
 
+/* 全局拖拽保护：从桌面拖文件/文件夹到门户（或跨 iframe 拖拽）时，
+   不拦截的话浏览器会直接打开拖入的文件，整个工作台被顶掉 */
+['dragover','dragenter'].forEach(ev => window.addEventListener(ev, e=>e.preventDefault()));
+window.addEventListener('drop', e=>e.preventDefault());
+
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-done]');
   if(!b) return;
