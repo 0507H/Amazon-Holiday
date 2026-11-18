@@ -589,8 +589,10 @@ select:focus,input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(4
               <span id="importMsg" style="font-size:11.5px;color:var(--text3)"></span>
             </div>
             <div style="padding:9px;background:#eef4ff;border-radius:7px;font-size:11px;color:#2b4a8a;line-height:1.9">
-              <b>导入说明</b>：支持三种格式 —— ① 看板导出的 <b>JSON 备份</b>（完整恢复）；② <b>CSV</b>（首行为表头，需含「日期/ASIN」列）；③ <b>XLSX</b>（如领星「销售表现-ASIN」按日导出，自动识别常用列名；内置轻量解析器，<b>断网也能导入</b>）。<br>
-              合并规则：<b>同一天 + 同一 ASIN</b> 的新行覆盖旧行，其余保留；费用列负数自动取绝对值；导入后立即重算全部看板、预警与待办，并保存在本机浏览器（localStorage），下次打开自动生效。
+              <b>导入说明</b>：支持两种导出文件，<b>自动识别类型</b> ——<br>
+              · <b>按日导出</b>（75 列，含「日期」列）→ 写入按日明细，用于销量/趋势/预测；<br>
+              · <b>汇总导出</b>（96 列，<b>没有日期列</b>，但含 FBA可售 / 库龄 / 滞销货值 / 周转）→ 导入时问一次「归属日期」，<b>自动更新库存快照</b>；若判定为单日数据（销量 ÷ 平均日销量 ≈ 1），同时写入当天明细，<b>一个文件就够</b>；若判定为多日累计，只更新库存、不写明细（避免把 30 天的量压进一天）。<br>
+              另外支持看板导出的 <b>JSON 备份</b>（完整恢复）。合并规则：<b>同一天 + 同一 ASIN</b> 新行覆盖旧行；费用列负数自动取绝对值；库存快照<b>只进不退</b>（导入更早日期的文件不会覆盖更新的库存）。数据与快照均保存在本机浏览器，下次打开自动生效。
             </div>
           </div>
         </div>
@@ -751,6 +753,10 @@ window.DASH.stockSnap = {"B0H9SWSBZC":{"fba":72.0,"inbound":0.0,"turnover":31.44
     return { rows, added, updated };
   }
 
+  /* 本机导入的库存快照（汇总导出）—— 与后方 UI 层的同名函数各在自己作用域，互不影响 */
+  function loadStockSnap() {
+    try { return JSON.parse(localStorage.getItem('dash_stock_v1') || '{}') || {}; } catch (e) { return {}; }
+  }
   window.DASH.mergeRows = function (newRows, opts = {}) {
     const { rows, added, updated } = mergeInto(window.DASH.rawRows, newRows);
     window.DASH.rawRows = rows;
@@ -772,6 +778,8 @@ window.DASH.stockSnap = {"B0H9SWSBZC":{"fba":72.0,"inbound":0.0,"turnover":31.44
       exportedAt: new Date().toISOString(),
       rawRows: window.DASH.rawRows,
       todoState: todo,
+      stockSnap: loadStockSnap(),
+      stockDate: (() => { try { return localStorage.getItem('dash_stock_date_v1') || ''; } catch (e) { return ''; } })(),
       prevYear,
       scope: (() => { try { return JSON.parse(localStorage.getItem('dash_scope_v1') || 'null'); } catch (e) { return null; } })(),
     };
@@ -792,7 +800,10 @@ window.DASH.stockSnap = {"B0H9SWSBZC":{"fba":72.0,"inbound":0.0,"turnover":31.44
   function recompute() {
     const rows = window.DASH.rawRows;
     const meta = window.DASH.asinMeta || {};
-    const stock = window.DASH.stockSnap || {};
+    /* 库存快照 = 种子快照 + 本机导入的「汇总导出」快照（按 ASIN 覆盖，导入的优先） */
+    const stock = Object.assign({}, window.DASH.stockSnap || {});
+    const lsSnap = loadStockSnap();
+    Object.keys(lsSnap).forEach(k => { stock[k] = Object.assign({}, stock[k] || {}, lsSnap[k]); });
 
     const dates = [...new Set(rows.map(r => r[F.DATE]))].sort();
     const n = dates.length;
@@ -1968,14 +1979,14 @@ function renderStock() {
     .filter(x => x.tot > 0).sort((x, y) => y.tot - x.tot).slice(0, 8);
   $('#ageChart').innerHTML = aged.length ? aged.map(({ p }) => {
     const g = p.ages || {};
-    const seg = [['≤90天', g.a30 + g.a60, '#06a561'], ['90-180天', g.a90, '#f08c00'], ['180-365天', g.a180, '#e15241'], ['365天+', g.a365, '#8b5cf6']];
+    const seg = [['0-60天', g.a30 + g.a60, '#06a561'], ['61-90天', g.a90, '#f08c00'], ['91-365天', g.a180, '#e15241'], ['365天+', g.a365, '#8b5cf6']];
     const tot = seg.reduce((s, x) => s + x[1], 0) || 1;
     return `<div style="margin-bottom:9px">
       <div style="display:flex;justify-content:space-between;font-size:11px"><span>${p.asin} · ${p.name.slice(0, 24)}</span><span style="color:var(--text3)">合计 ${fmt(tot)} 件</span></div>
       <div style="display:flex;height:16px;border-radius:4px;overflow:hidden;margin-top:4px">
         ${seg.filter(s2 => s2[1] > 0).map(s2 => `<div style="width:${s2[1] / tot * 100}%;background:${s2[2]}" title="${s2[0]}: ${fmt(s2[1])} 件"></div>`).join('')}
       </div></div>`;
-  }).join('') + `<div style="font-size:10.5px;color:var(--text3);margin-top:6px">色块：<span style="color:#06a561">≤90天</span> / <span style="color:#f08c00">90-180天</span> / <span style="color:#e15241">180-365天</span> / <span style="color:#8b5cf6">365天+</span>（按库存快照库龄分段）</div>`
+  }).join('') + `<div style="font-size:10.5px;color:var(--text3);margin-top:6px">色块：<span style="color:#06a561">0-60天</span> / <span style="color:#f08c00">61-90天</span> / <span style="color:#e15241">91-365天</span> / <span style="color:#8b5cf6">365天+</span>（按库存快照库龄分段）</div>`
     : '<div class="nodata">所有 ASIN 库龄均在 90 天内，无超龄库存 ✓</div>';
 }
 
@@ -2027,10 +2038,38 @@ const HEADER_ALIASES = {
   'buybox': 26, '购物车占比': 26, 'buy box赢得率': 26,
 };
 
-function rowsFromTable(headers, body) {
+/* 库存快照列 → stockSnap 字段
+   库存是「某一天的存量快照」，不是逐日流水：不写进按日明细（否则销量=0 的库存行会拉低日均、污染趋势），
+   而是单独存一份快照，覆盖种子里的旧库存。汇总导出（96 列）才有这些列，按日导出（75 列）没有。 */
+const STOCK_ALIASES = {
+  'fba可售': 'fba', 'fba可售库存': 'fba', '可售库存': 'fba', 'fba库存': 'fba', 'afn-fba可售': 'fba', '库存量': 'fba', '可用库存': 'fba',
+  '调拨中': 'transfer',
+  '计划入库（fba）': 'inbPlan', '计划入库(fba)': 'inbPlan',
+  '已发货（fba）': 'inbShipped', '已发货(fba)': 'inbShipped',
+  '入库中（fba）': 'inbReceiving', '入库中(fba)': 'inbReceiving',
+  'fba可售周转': 'turnoverFba', '库周转': 'turnover', '总周转': 'turnoverAll',
+  '滞销量': 'deadQty', '滞销货值': 'deadValue', '动销率': 'sellThrough',
+  '库龄（0~30）': 'age30', '库龄(0~30)': 'age30', '库龄0~30': 'age30',
+  '库龄（31~60）': 'age60', '库龄(31~60)': 'age60', '库龄31~60': 'age60',
+  '库龄（61~90）': 'age90', '库龄(61~90)': 'age90', '库龄61~90': 'age90',
+  '库龄（91~180）': 'ageMid', '库龄(91~180)': 'ageMid', '库龄91~180': 'ageMid',
+  '库龄（181~270）': 'ageMid', '库龄(181~270)': 'ageMid', '库龄181~270': 'ageMid',
+  '库龄（271~330）': 'ageMid', '库龄(271~330)': 'ageMid', '库龄271~330': 'ageMid',
+  '库龄（331~365）': 'ageMid', '库龄(331~365)': 'ageMid', '库龄331~365': 'ageMid',
+  '库龄（365+）': 'age365', '库龄(365+)': 'age365', '库龄365+': 'age365',
+};
+const hasDateCol = headers => headers.some(h => /日期|date/i.test(String(h ?? '')));
+
+function rowsFromTable(headers, body, opt = {}) {
   const idx = headers.map(h => HEADER_ALIASES[String(h).trim().toLowerCase()] ?? HEADER_ALIASES[String(h).trim()] ?? null);
-  if (idx[0] === null || idx[1] === null) throw new Error('表头缺少「日期」或「ASIN」列');
+  const sidx = headers.map(h => STOCK_ALIASES[String(h).trim()] ?? STOCK_ALIASES[String(h).trim().toLowerCase()] ?? null);
+  const dateOK = hasDateCol(headers);
+  const fallback = opt.fallbackDate || '';
+  if (!dateOK && !fallback) throw new Error('表头缺少「日期」列（汇总导出没有日期，需要指定归属日期）');
+  if (!headers.some(h => /^asin$/i.test(String(h ?? '').trim()))) throw new Error('表头缺少「ASIN」列，无法关联产品');
   const out = [];
+  const stockOut = opt.stockOut || null;
+  let stockN = 0;
   body.forEach(r => {
     const row = new Array(27).fill(0);
     let has = false;
@@ -2043,8 +2082,31 @@ function rowsFromTable(headers, body) {
       const num = parseFloat(String(v).replace(/[$,%\s,]/g, ''));
       if (!isNaN(num)) row[target] = num;
     });
+    if (!row[0] && fallback) row[0] = fallback;
+    /* ASIN：主表若没解析到（库存-only 表），从库存列所在的同一行找 ASIN 列 */
+    if (!row[1]) {
+      const ai = headers.findIndex(h => /^asin$/i.test(String(h).trim()));
+      if (ai >= 0) row[1] = String(r[ai] ?? '').trim();
+    }
+    /* 库存快照收集（与明细分开存） */
+    if (stockOut && row[1] && sidx.some(Boolean)) {
+      const sn = {};
+      sidx.forEach((f, i) => {
+        if (!f) return;
+        const num = parseFloat(String(r[i] ?? '').replace(/[$,%\s,]/g, ''));
+        if (isNaN(num)) return;
+        sn[f] = (sn[f] || 0) + Math.abs(num);
+      });
+      if (Object.keys(sn).length) {
+        /* 库龄 91-365 合并进 age180 桶（看板只有 5 个库龄段） */
+        if ('ageMid' in sn) { sn.age180 = (sn.age180 || 0) + sn.ageMid; delete sn.ageMid; }
+        stockOut[row[1]] = sn;
+        stockN++;
+      }
+    }
     if (has && row[0] && row[1]) out.push(row);
   });
+  if (stockOut) stockOut.__n = stockN;
   return out;
 }
 
@@ -2162,6 +2224,67 @@ async function readXlsxNative(arrayBuffer) {
   }
   return aoa;
 }
+/* ===== 库存快照存储（汇总导出专用，独立于按日明细） ===== */
+const LS_STOCK = 'dash_stock_v1', LS_STOCK_DATE = 'dash_stock_date_v1';
+function loadStockSnap() {
+  /* 用字面量而非上面的 const：本函数会被更早执行的 recompute 调用 */
+  try { return JSON.parse(localStorage.getItem('dash_stock_v1') || '{}') || {}; } catch (e) { return {}; }
+}
+function saveStockSnap(snap, date) {
+  const cur = loadStockSnap();
+  let n = 0, skipped = 0;
+  Object.keys(snap).forEach(k => {
+    if (k === '__n') return;
+    const old = cur[k];
+    /* 快照只进不退：导入更早日期的文件不能覆盖更新日期的库存 */
+    if (old && old.snapDate && date && old.snapDate > date) { skipped++; return; }
+    cur[k] = Object.assign({}, old || {}, snap[k], { snapDate: date });
+    n++;
+  });
+  try { localStorage.setItem('dash_stock_v1', JSON.stringify(cur)); } catch (e) { console.warn('库存快照写入失败', e); }
+  try {
+    const prevD = localStorage.getItem('dash_stock_date_v1') || '';
+    if (date && (!prevD || date > prevD)) localStorage.setItem('dash_stock_date_v1', date);
+  } catch (e) {}
+  return { n, skipped };
+}
+function stockSnapDate() {
+  try { return localStorage.getItem('dash_stock_date_v1') || ''; } catch (e) { return ''; }
+}
+/* 文件名里的 8 位日期（20261117151712 → 2026-11-17） */
+function dateFromFileName(name) {
+  const m = String(name).match(/(20\d{2})[-_]?(\d{2})[-_]?(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+}
+/* 汇总导出没有日期列：问一次归属日期（默认文件名日期 / 今天），可改 */
+function askImportDate(name) {
+  const guess = dateFromFileName(name) || todayStr();
+  const v = prompt(
+    '这个文件没有「日期」列（通常是「汇总导出」）。\n' +
+    '请填这份数据归属的日期，格式 2026-11-17：', guess);
+  if (v === null) throw new Error('已取消导入');
+  const d = normDate(String(v).trim());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error('日期格式不对：' + v + '（应为 2026-11-17）');
+  return d;
+}
+/* 用 销量 ÷ 平均日销量 推断这份数据覆盖几天：≈1 为单日快照，>1.5 为多日累计 */
+function spanDaysOf(aoa) {
+  if (!aoa || aoa.length < 2) return null;
+  const hdr = aoa[0].map(h => String(h == null ? '' : h).trim());
+  const iu = hdr.findIndex(h => h === '销量');
+  const ia = hdr.findIndex(h => h.indexOf('平均日销量') >= 0);
+  if (iu < 0 || ia < 0) return null;
+  const ratios = [];
+  for (let i = 1; i < aoa.length; i++) {
+    const u = parseFloat(String(aoa[i][iu] == null ? '' : aoa[i][iu]).replace(/[,$%\s,]/g, ''));
+    const a = parseFloat(String(aoa[i][ia] == null ? '' : aoa[i][ia]).replace(/[,$%\s,]/g, ''));
+    if (!isNaN(u) && !isNaN(a) && u > 0 && a > 0) ratios.push(u / a);
+  }
+  if (!ratios.length) return null;
+  ratios.sort((x, y) => x - y);
+  return ratios[Math.floor(ratios.length / 2)];
+}
+
 function handleImportFile(file, sel) {
   importMsg(`正在解析 ${file.name} …`, false, sel);
   /* 解析提示遮罩：解析大文件时给出明确反馈 */
@@ -2172,7 +2295,7 @@ function handleImportFile(file, sel) {
   reader.onload = e => {
     setTimeout(async () => {   // 先让提示渲染，再执行重解析
       try {
-        let newRows = [], restoreTodo = null;
+        let newRows = [], restoreTodo = null, stockSnap = null, impDate = '', stockInfo = '';
         const name = file.name.toLowerCase();
         if (name.endsWith('.json')) {
           const data = JSON.parse(e.target.result);
@@ -2190,6 +2313,12 @@ function handleImportFile(file, sel) {
             if (data.scope && Array.isArray(data.scope.asins)) {   // 今年产品清单随备份恢复
               try { localStorage.setItem('dash_scope_v1', JSON.stringify(data.scope)); } catch (e) {}
             }
+            if (data.stockSnap && typeof data.stockSnap === 'object') {   // 库存快照随备份恢复（换电脑/换浏览器不丢库存）
+              try {
+                localStorage.setItem('dash_stock_v1', JSON.stringify(data.stockSnap));
+                if (data.stockDate) localStorage.setItem('dash_stock_date_v1', data.stockDate);
+              } catch (e) {}
+            }
           } else throw new Error('JSON 应为备份数组，或 { rawRows, todoState } 备份对象');
         } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
           let aoa;
@@ -2203,14 +2332,50 @@ function handleImportFile(file, sel) {
           } else {
             throw new Error('旧版 .xls 需联网加载 SheetJS 才能解析；建议另存为 .xlsx 或导出 CSV 再导入');
           }
-          newRows = rowsFromTable(aoa[0], aoa.slice(1));
+          /* —— 汇总导出（无日期列）：先问归属日期，库存单独存快照 —— */
+          const hdr = (aoa[0] || []).map(h => String(h == null ? '' : h).trim());
+          const noDate = !hasDateCol(hdr);
+          if (noDate) impDate = askImportDate(file.name);
+          stockSnap = {};
+          newRows = rowsFromTable(aoa[0], aoa.slice(1), { fallbackDate: impDate, stockOut: stockSnap });
+          if (noDate) {
+            const span = spanDaysOf(aoa);
+            const stockN = stockSnap.__n || 0;
+            if (span !== null && span > 1.5 && stockN > 0) {
+              /* 多日累计：明细不能当单日写入（会把 30 天的量压进一天），只更新库存 */
+              newRows = [];
+              stockInfo = `这份数据是 ${Math.round(span)} 天累计（销量÷平均日销量=${span.toFixed(1)}），按日明细不写入，只更新库存；明细请用「按日导出」文件导入。`;
+            }
+          }
         } else {
           let text = e.target.result;
           if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
           const aoa = parseCSV(text);
-          newRows = rowsFromTable(aoa[0], aoa.slice(1));
+          const hdr = (aoa[0] || []).map(h => String(h == null ? '' : h).trim());
+          const noDate = !hasDateCol(hdr);
+          if (noDate) impDate = askImportDate(file.name);
+          stockSnap = {};
+          newRows = rowsFromTable(aoa[0], aoa.slice(1), { fallbackDate: impDate, stockOut: stockSnap });
+          if (noDate) {
+            const span = spanDaysOf(aoa);
+            const stockN = stockSnap.__n || 0;
+            if (span !== null && span > 1.5 && stockN > 0) { newRows = []; stockInfo = `这份数据是 ${Math.round(span)} 天累计，按日明细不写入，只更新库存；明细请用「按日导出」文件导入。`; }
+          }
         }
-        if (!newRows.length) throw new Error('未解析到有效数据行（需含 日期 + ASIN 列）');
+        /* 库存快照落盘（只进不退：更早日期的文件不覆盖更新的库存） */
+        let stockMsg = '';
+        if (stockSnap && (stockSnap.__n || 0) > 0) {
+          const w = saveStockSnap(stockSnap, impDate);
+          stockMsg = `库存快照：写入 ${w.n} 个 ASIN${w.skipped ? `、跳过 ${w.skipped} 个（本地快照更新）` : ''}，快照日 ${impDate}。`;
+        }
+        if (!newRows.length) {
+          if (stockMsg) {
+            importMsg(`✅ ${stockMsg}${stockInfo ? ' ' + stockInfo : ''} 按日明细未变更，看板已按新库存重算`, false, sel);
+            setTimeout(() => location.reload(), 1200);
+            return;
+          }
+          throw new Error('未解析到有效数据行（需含 日期 + ASIN 列，或含 FBA可售 等库存列的汇总导出）');
+        }
         const r = window.DASH.mergeRows(newRows);
         let todoN = 0;
         if (restoreTodo && typeof restoreTodo === 'object') {
@@ -2223,7 +2388,7 @@ function handleImportFile(file, sel) {
           });
           localStorage.setItem('dash_todo_v1', JSON.stringify(local));
         }
-        importMsg(`✅ 合并完成：新增 ${r.added} 行、覆盖 ${r.updated} 行，当前共 ${r.total} 行明细${todoN ? `；恢复任务记录 ${todoN} 条` : ''}，看板已全量重算`, false, sel);
+        importMsg(`✅ 合并完成：新增 ${r.added} 行、覆盖 ${r.updated} 行，当前共 ${r.total} 行明细${todoN ? `；恢复任务记录 ${todoN} 条` : ''}${stockMsg ? '；' + stockMsg : ''}${stockInfo ? ' ' + stockInfo : ''}，看板已全量重算`, false, sel);
         setTimeout(() => location.reload(), 1200);
       } catch (err) {
         importMsg('❌ 导入失败：' + err.message, true, sel);
@@ -2266,7 +2431,13 @@ function renderHolidayPage() {
         ${r.icon} ${r.name} <span style="font-size:9.5px;color:var(--text3)">${r.peak.slice(2)}${dp >= 0 && dp <= 60 ? ' · 剩' + dp + '天' : ''}</span></button>`; }).join('');
   $('#holAuto').textContent = `当前：${ov === 'auto' ? '自动判定 → ' + cur.name : (cur.name + '（手动）')}`;
   $('#holName').textContent = `${cur.icon} ${cur.name} · 节奏档案`;
-  $('#holSub').textContent = `${cur.en} · 峰值 ${cur.peak} · 清货截止 ${cur.clearBy} · ${cur.est ? '档期为预估，以官方公告为准' : '全节点自动倒计时'}`;
+  /* 库存快照提示：补货/断货结论全靠它，过期必须显性告警 */
+  const _sd = stockSnapDate();
+  const _sdAge = _sd ? Math.round((new Date(today) - new Date(_sd)) / 864e5) : null;
+  const _sdHtml = _sd
+    ? ` · 库存快照 <b style="color:${_sdAge > 3 ? 'var(--up)' : 'var(--text2)'}">${_sd}${_sdAge > 0 ? `（${_sdAge} 天前）` : '（今天）'}</b>${_sdAge > 3 ? ` ⚠ 补货与断货判断可能失真，去「数据源」导一份最新「汇总导出」` : ''}`
+    : ' · 库存快照：内置种子（还没导入过「汇总导出」）';
+  $('#holSub').innerHTML = `${cur.en} · 峰值 ${cur.peak} · 清货截止 ${cur.clearBy} · ${cur.est ? '档期为预估，以官方公告为准' : '全节点自动倒计时'}${_sdHtml}`;
 
   /* 节奏档案：阶段时间轴 + 关键节点 */
   const nodes = [
@@ -3527,10 +3698,17 @@ function renderArchives() {
     `<div style="font-size:10.5px;color:var(--text3);margin-top:8px">提示：归档保存在本机浏览器 localStorage（有容量上限，约能存 2-3 个月度归档）；跨设备请用「⬇ JSON」导出文件保存。</div>`;
 }
 function renderDataPage() {
+  const snapD = stockSnapDate();
+  const lsSnap = loadStockSnap();
+  const snapN = Object.keys(lsSnap).length;
+  const snapAge = snapD ? Math.round((new Date(todayStr()) - new Date(snapD)) / 86400000) : null;
+  const snapTxt = snapD
+    ? `${snapD}（导入 ${snapN} 个 ASIN）${snapAge > 3 ? ` · <b style="color:#d63031">已 ${snapAge} 天未更新，库存可能失真</b>` : ' · 新鲜'}`
+    : '<span style="color:#8a5a00">未导入过汇总文件，当前用的是内置种子快照</span>';
   $('#dataInfo').innerHTML = `<table><tbody>
     ${[['源文件', M.sourceFile], ['Sheet', '子列表-按日导出（唯一）'], ['原始规模', '6,647 行 × 112 列'],
     ['时间范围', `${M.dateFrom} ~ ${M.dateTo}（${M.days} 天）`], ['ASIN 数', M.asinCount + ' 个（MSKU/SKU 与 ASIN 1:1）'],
-    ['店铺', M.store], ['站点 / 币种', M.sites + ' / ' + M.currency], ['更新于', M.updatedAt]]
+    ['店铺', M.store], ['站点 / 币种', M.sites + ' / ' + M.currency], ['库存快照', snapTxt], ['更新于', M.updatedAt]]
       .map(([k, v]) => `<tr><td style="color:var(--text2);width:86px">${k}</td><td style="word-break:break-all">${v}</td></tr>`).join('')}
   </tbody></table>
   <div style="margin-top:10px;padding:9px;background:#fff8e6;border-radius:7px;font-size:11px;color:#8a5a00;line-height:1.85">
