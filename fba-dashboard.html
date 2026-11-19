@@ -588,6 +588,10 @@ select:focus,input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(4
               <button class="fbtn" id="btnClearImport" style="color:#d63031">🗑 清除全部数据（回到空白首页）</button>
               <span id="importMsg" style="font-size:11.5px;color:var(--text3)"></span>
             </div>
+            <div style="margin:0 0 12px;padding:9px 12px;border:1.5px dashed #c7d4ff;border-radius:8px;background:#f7f9ff;font-size:11.5px;color:#3b4f8a;display:flex;align-items:center;gap:8px">
+              <span style="font-size:15px">📥</span><span><b>也可以直接拖拽</b>：把文件拖到页面任意位置，松手即开始解析；拖入时全屏提示「松开鼠标导入」，解析中、成功、失败都有明确反馈，不会静默无响应。</span>
+            </div>
+            <div id="importStatus" class="hide" style="margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:11.5px;line-height:1.7"></div>
             <div style="padding:9px;background:#eef4ff;border-radius:7px;font-size:11px;color:#2b4a8a;line-height:1.9">
               <b>导入说明</b>：支持两种导出文件，<b>自动识别类型</b> ——<br>
               · <b>按日导出</b>（75 列，含「日期」列）→ 写入按日明细，用于销量/趋势/预测；<br>
@@ -643,10 +647,21 @@ select:focus,input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(4
 
 <!-- 文件解析中提示 -->
 <div id="parseTip" class="hide" style="position:fixed;inset:0;z-index:200;background:rgba(19,24,38,.45);display:flex;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:12px;padding:24px 34px;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.18)">
-    <div class="spin"></div>
+  <div style="background:#fff;border-radius:12px;padding:24px 34px;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.18);max-width:440px">
+    <div id="parseTipSpin" class="spin"></div>
+    <div id="parseTipIcon" style="display:none;font-size:30px;line-height:1">✅</div>
     <div id="parseTipTxt" style="font-size:13px;font-weight:600;margin-top:12px">正在解析文件…</div>
-    <div style="font-size:11px;color:var(--text3);margin-top:5px">大文件解析可能需要十几秒，请勿关闭页面</div>
+    <div id="parseTipSub" style="font-size:11px;color:var(--text3);margin-top:5px;line-height:1.7">大文件解析可能需要十几秒，请勿关闭页面</div>
+    <button id="parseTipClose" class="fbtn hide" style="margin-top:12px">关闭</button>
+  </div>
+</div>
+
+<!-- 全页拖拽提示：拖入文件时全屏出现，松手即导入 -->
+<div id="dropVeil" class="hide" style="position:fixed;inset:0;z-index:300;background:rgba(19,24,38,.55);display:flex;align-items:center;justify-content:center;pointer-events:none">
+  <div style="border:2px dashed rgba(255,255,255,.85);border-radius:16px;padding:36px 54px;text-align:center;color:#fff;background:rgba(29,63,168,.25)">
+    <div style="font-size:34px;line-height:1">📥</div>
+    <div style="font-size:16px;font-weight:700;margin-top:9px">松开鼠标，导入到工作台</div>
+    <div id="dropVeilName" style="font-size:11.5px;opacity:.9;margin-top:6px">支持 Excel / CSV / JSON 备份 · 一次一个文件</div>
   </div>
 </div>
 
@@ -1991,7 +2006,19 @@ function renderStock() {
 }
 
 /* ===== 数据导入 / 导出 ===== */
-function importMsg(t, err, sel) { const el = $(sel || '#importMsg'); if (!el) return; el.textContent = t; el.style.color = err ? '#d63031' : 'var(--text3)'; }
+function importMsg(t, err, sel) {
+  const el = $(sel || '#importMsg'); if (!el) return;
+  el.textContent = t; el.style.color = err ? '#d63031' : 'var(--text3)';
+  /* 数据源页另给一条醒目的状态条：成功绿 / 失败红 / 进行中蓝，避免"看不出有没有导入成功" */
+  const st = document.getElementById('importStatus');
+  if (st && (!sel || sel === '#importMsg')) {
+    const ok = /^✅/.test(t), busy = /^⏳/.test(t);
+    st.classList.remove('hide');
+    st.textContent = t;
+    st.style.background = err ? '#fdecea' : (ok ? '#e8f8ef' : '#eef4ff');
+    st.style.color = err ? '#a61b1b' : (ok ? '#1a7f45' : '#2b4a8a');
+  }
+}
 
 function parseCSV(text) {
   const rows = []; let cur = [''], inQ = false;
@@ -2302,16 +2329,42 @@ function spanDaysOf(aoa) {
   return ratios[Math.floor(ratios.length / 2)];
 }
 
+/* ===== 导入提示遮罩的三种状态：busy / ok / err ===== */
+function tipState(kind, txt, sub) {
+  const t = $('#parseTip'), sp = $('#parseTipSpin'), ic = $('#parseTipIcon'), cl = $('#parseTipClose');
+  if (!t) return;
+  t.classList.remove('hide');
+  if (sp) sp.style.display = kind === 'busy' ? '' : 'none';
+  if (ic) { ic.style.display = kind === 'busy' ? 'none' : ''; ic.textContent = kind === 'ok' ? '✅' : '❌'; }
+  const tx = $('#parseTipTxt'), sb = $('#parseTipSub');
+  if (tx) tx.textContent = txt;
+  if (sb) sb.textContent = sub || '';
+  if (cl) cl.classList.toggle('hide', kind === 'busy');
+  if (t.__timer) { clearTimeout(t.__timer); t.__timer = null; }
+  if (kind === 'err') t.__timer = setTimeout(() => t.classList.add('hide'), 9000);
+}
+function tipHide() { const t = $('#parseTip'); if (t) t.classList.add('hide'); }
+
+let __importing = false;
 function handleImportFile(file, sel) {
-  importMsg(`正在解析 ${file.name} …`, false, sel);
-  /* 解析提示遮罩：解析大文件时给出明确反馈 */
-  const tip = $('#parseTip'), tipTxt = $('#parseTipTxt');
-  if (tipTxt) tipTxt.textContent = `正在解析 ${file.name} …`;
-  if (tip) tip.classList.remove('hide');
+  if (__importing) { importMsg('⏳ 上一个文件还在导入中，请等它完成（不会丢数据，重复拖入会被忽略）', false, sel); return; }
+  const ext = ((file.name.match(/\.[^.]+$/) || [''])[0] || '').toLowerCase();
+  if (['.xlsx', '.xls', '.csv', '.json'].indexOf(ext) < 0) {
+    const m = `不支持的文件类型「${ext || '无扩展名'}」，请导入 .xlsx / .xls / .csv / .json`;
+    importMsg('❌ ' + m, true, sel); tipState('err', '导入失败', m);
+    return;
+  }
+  __importing = true;
+  const sizeMB = file.size / 1048576;
+  const sizeTxt = sizeMB >= 1 ? `${sizeMB.toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+  importMsg(`⏳ 正在读取 ${file.name}（${sizeTxt}）…`, false, sel);
+  tipState('busy', `正在读取 ${file.name}`, `${sizeTxt} · 读取完成后会自动解析，请勿关闭页面`);
   const reader = new FileReader();
   reader.onload = e => {
     setTimeout(async () => {   // 先让提示渲染，再执行重解析
       try {
+        tipState('busy', `正在解析 ${file.name}`, `${sizeTxt} · 文件已读取，正在解析表头与数据行，大文件可能需要十几秒`);
+        importMsg(`⏳ 正在解析 ${file.name}（${sizeTxt}）…`, false, sel);
         let newRows = [], restoreTodo = null, stockSnap = null, impDate = '', stockInfo = '';
         const name = file.name.toLowerCase();
         if (name.endsWith('.json')) {
@@ -2387,8 +2440,10 @@ function handleImportFile(file, sel) {
         }
         if (!newRows.length) {
           if (stockMsg) {
-            importMsg(`✅ ${stockMsg}${stockInfo ? ' ' + stockInfo : ''} 按日明细未变更，看板已按新库存重算`, false, sel);
-            setTimeout(() => location.reload(), 1200);
+            const okTxt = `${stockMsg}${stockInfo ? ' ' + stockInfo : ''} 按日明细未变更，看板已按新库存重算`;
+            importMsg(`✅ ${okTxt}`, false, sel);
+            tipState('ok', '导入成功', okTxt + ' · 正在刷新…');
+            setTimeout(() => location.reload(), 1500);
             return;
           }
           throw new Error('未解析到有效数据行（需含 日期 + ASIN 列，或含 FBA可售 等库存列的汇总导出）');
@@ -2405,16 +2460,23 @@ function handleImportFile(file, sel) {
           });
           localStorage.setItem('dash_todo_v1', JSON.stringify(local));
         }
-        importMsg(`✅ 合并完成：新增 ${r.added} 行、覆盖 ${r.updated} 行，当前共 ${r.total} 行明细${todoN ? `；恢复任务记录 ${todoN} 条` : ''}${stockMsg ? '；' + stockMsg : ''}${stockInfo ? ' ' + stockInfo : ''}，看板已全量重算`, false, sel);
-        setTimeout(() => location.reload(), 1200);
+        const okTxt = `新增 ${r.added} 行、覆盖 ${r.updated} 行，当前共 ${r.total} 行明细${todoN ? `；恢复任务记录 ${todoN} 条` : ''}${stockMsg ? '；' + stockMsg : ''}${stockInfo ? ' ' + stockInfo : ''}`;
+        importMsg(`✅ 合并完成：${okTxt}，看板已全量重算`, false, sel);
+        tipState('ok', '导入成功', okTxt + ' · 正在刷新…');
+        setTimeout(() => location.reload(), 1500);
       } catch (err) {
         importMsg('❌ 导入失败：' + err.message, true, sel);
+        tipState('err', '导入失败', err.message);
       } finally {
-        if (tip) tip.classList.add('hide');
+        __importing = false;
       }
     }, 80);
   };
-  reader.onerror = () => { if (tip) tip.classList.add('hide'); importMsg('❌ 文件读取失败，请重试', true, sel); };
+  reader.onerror = () => {
+    __importing = false;
+    importMsg('❌ 文件读取失败，请重试', true, sel);
+    tipState('err', '文件读取失败', '可能是文件被占用或损坏，换个文件或重新导出再试');
+  };
   if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) reader.readAsArrayBuffer(file);
   else reader.readAsText(file, 'utf-8');
 }
@@ -2429,9 +2491,40 @@ function bootGate() {
   fi.addEventListener('change', e => { if (e.target.files[0]) handleImportFile(e.target.files[0], '#gateMsg'); e.target.value = ''; });
   ['dragover', 'dragenter'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('on'); }));
   ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('on'); }));
-  dz.addEventListener('drop', e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleImportFile(f, '#gateMsg'); });
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('on'); });   /* 实际导入由全页拖拽统一处理，避免重复触发 */
   $('#gateSeed').onclick = () => { try { localStorage.setItem('dash_seed_v1', '1'); } catch (e) {} location.reload(); };
 }
+
+/* ===== 全页拖拽导入：任意位置拖入都有全屏提示，松手即解析（成功/失败也有明确反馈） ===== */
+function dropTargetMsgSel() {
+  const g = document.getElementById('gate');
+  return (g && !g.classList.contains('hide')) ? '#gateMsg' : '#importMsg';
+}
+(function initDragImport() {
+  const hasFiles = e => { const t = e.dataTransfer; return !!t && Array.from(t.types || []).indexOf('Files') >= 0; };
+  let depth = 0;
+  const showVeil = e => {
+    const v = document.getElementById('dropVeil'); if (!v) return;
+    v.classList.remove('hide');
+    const nm = document.getElementById('dropVeilName');
+    const fs = e.dataTransfer && e.dataTransfer.files;
+    if (nm) nm.textContent = (fs && fs.length > 1) ? `检测到 ${fs.length} 个文件，只会导入第一个` : '支持 Excel / CSV / JSON 备份 · 松手即开始解析';
+  };
+  const hideVeil = () => { const v = document.getElementById('dropVeil'); if (v) v.classList.add('hide'); };
+  window.addEventListener('dragenter', e => { if (!hasFiles(e)) return; e.preventDefault(); depth++; showVeil(e); });
+  window.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); try { e.dataTransfer.dropEffect = 'copy'; } catch (err) {} showVeil(e); });
+  window.addEventListener('dragleave', e => { if (!hasFiles(e)) return; depth--; if (depth <= 0) { depth = 0; hideVeil(); } });
+  window.addEventListener('drop', e => {
+    if (!hasFiles(e)) return;              /* 页面内文字/元素拖拽不拦截 */
+    e.preventDefault();                    /* 阻止浏览器直接打开文件 */
+    depth = 0; hideVeil();
+    const fs = e.dataTransfer.files;
+    if (!fs || !fs.length) return;
+    const sel = dropTargetMsgSel();
+    if (fs.length > 1) importMsg(`一次只导入 1 个文件，本次只取「${fs[0].name}」`, false, sel);
+    handleImportFile(fs[0], sel);
+  });
+})();
 
 /* ===== 季节 ===== */
 function renderHolidayPage() {
