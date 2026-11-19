@@ -591,7 +591,7 @@ select:focus,input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(4
             <div style="padding:9px;background:#eef4ff;border-radius:7px;font-size:11px;color:#2b4a8a;line-height:1.9">
               <b>导入说明</b>：支持两种导出文件，<b>自动识别类型</b> ——<br>
               · <b>按日导出</b>（75 列，含「日期」列）→ 写入按日明细，用于销量/趋势/预测；<br>
-              · <b>汇总导出</b>（96 列，<b>没有日期列</b>，但含 FBA可售 / 库龄 / 滞销货值 / 周转）→ 导入时问一次「归属日期」，<b>自动更新库存快照</b>；若判定为单日数据（销量 ÷ 平均日销量 ≈ 1），同时写入当天明细，<b>一个文件就够</b>；若判定为多日累计，只更新库存、不写明细（避免把 30 天的量压进一天）。<br>
+              · <b>汇总导出</b>（96 列，<b>没有日期列</b>，但含 FBA可售 / 库龄 / 滞销货值 / 周转）→ <b>按文件名自动识别归属日期</b>：把日期写进文件名即可，如 <b>26圣诞-11.19-汇总</b>（单日）或 <b>26圣诞-11.19~11.23-汇总</b>（区间，取结束日），也支持 20261119 / 11月19 写法；文件名没日期才会弹窗补问。<b>自动更新库存快照</b>；若判定为单日数据（销量 ÷ 平均日销量 ≈ 1），同时写入当天明细，<b>一个文件就够</b>；若判定为多日累计，只更新库存、不写明细（避免把 30 天的量压进一天）。<br>
               另外支持看板导出的 <b>JSON 备份</b>（完整恢复）。合并规则：<b>同一天 + 同一 ASIN</b> 新行覆盖旧行；费用列负数自动取绝对值；库存快照<b>只进不退</b>（导入更早日期的文件不会覆盖更新的库存）。数据与快照均保存在本机浏览器，下次打开自动生效。
             </div>
           </div>
@@ -2252,17 +2252,33 @@ function saveStockSnap(snap, date) {
 function stockSnapDate() {
   try { return localStorage.getItem('dash_stock_date_v1') || ''; } catch (e) { return ''; }
 }
-/* 文件名里的 8 位日期（20261117151712 → 2026-11-17） */
+/* 从文件名识别日期（命名规范：26圣诞-11.19-汇总 / 26圣诞-11.19~11.23-汇总 / 20261119-汇总）
+   区间取结束日（快照以最新一天为准）；跨年自动回退（1月导入12月的数据 → 上一年） */
 function dateFromFileName(name) {
-  const m = String(name).match(/(20\d{2})[-_]?(\d{2})[-_]?(\d{2})/);
-  return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+  const s = String(name);
+  const today = new Date();
+  const mk = (y, m, d) => {
+    if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return '';
+    let ds = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    if (new Date(ds) - today > 7 * 864e5) ds = `${y - 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return ds;
+  };
+  let m = s.match(/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})/);                    // 20261119 / 2026-11-19
+  if (m) return mk(+m[1], +m[2], +m[3]);
+  m = s.match(/(\d{1,2})[.月](\d{1,2})\s*[~～\-—–至到]\s*(\d{1,2})[.月](\d{1,2})/);  // 11.19~11.23 / 11月19至11月23
+  if (m) return mk(today.getFullYear(), +m[3], +m[4]);
+  m = s.match(/(\d{1,2})[.月](\d{1,2})/);                                     // 11.19 / 11月19
+  if (m) return mk(today.getFullYear(), +m[1], +m[2]);
+  return '';
 }
-/* 汇总导出没有日期列：问一次归属日期（默认文件名日期 / 今天），可改 */
+/* 汇总导出没有日期列：文件名符合命名规范 → 直接用文件名日期（区间取结束日）；
+   文件名没有日期才弹窗问（默认今天），可改 */
 function askImportDate(name) {
-  const guess = dateFromFileName(name) || todayStr();
+  const guess = dateFromFileName(name);
+  if (guess) return guess;   // 按命名规范自动识别，不弹窗
   const v = prompt(
     '这个文件没有「日期」列（通常是「汇总导出」）。\n' +
-    '请填这份数据归属的日期，格式 2026-11-17：', guess);
+    '请填这份数据归属的日期，格式 2026-11-17：\n（下次可把日期写进文件名自动识别，如 26圣诞-11.19-汇总）', todayStr());
   if (v === null) throw new Error('已取消导入');
   const d = normDate(String(v).trim());
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error('日期格式不对：' + v + '（应为 2026-11-17）');
