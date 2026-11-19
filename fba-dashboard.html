@@ -926,7 +926,7 @@ window.DASH.stockSnap = {"B0H9SWSBZC":{"fba":72.0,"inbound":0.0,"turnover":31.44
         p.turnover = s.turnover || 0;
         p.deadValue = s.deadValue || 0;
         p.deadQty = s.deadQty || 0;
-        p.ages = { a30: s.age30 || 0, a60: s.age60 || 0, a90: s.age90 || 0, a180: s.age180 || 0, a365: s.age365 || 0 };
+        p.ages = { a30: s.age30 || 0, a60: s.age60 || 0, a90: s.age90 || 0, a91: s.age91 || 0, a181: s.age181 || 0, a271: s.age271 || 0, a331: s.age331 || 0, a365: s.age365 || 0 };
         p.dos = p.avgDaily7 > 0 ? p.fbaStock / p.avgDaily7 : (p.fbaStock > 0 ? 999 : 0);
       } else {
         p.fbaStock = null; p.inbound = null; p.dos = null; p.turnover = 0; p.deadValue = 0;
@@ -1975,18 +1975,18 @@ function renderStock() {
   }).join('') : `<tr><td colspan="13" class="nodata">「${fCur}」状态下暂无 ASIN ✓</td></tr>`;
 
   // 库龄结构：取库龄件数 Top8
-  const aged = s.list.map(p => ({ p, tot: (p.ages ? p.ages.a90 + p.ages.a180 + p.ages.a365 : 0) + (p.deadQty || 0) }))
+  const aged = s.list.map(p => ({ p, tot: (p.ages ? p.ages.a90 + p.ages.a91 + p.ages.a181 + p.ages.a271 + p.ages.a331 + p.ages.a365 : 0) + (p.deadQty || 0) }))
     .filter(x => x.tot > 0).sort((x, y) => y.tot - x.tot).slice(0, 8);
   $('#ageChart').innerHTML = aged.length ? aged.map(({ p }) => {
     const g = p.ages || {};
-    const seg = [['0-60天', g.a30 + g.a60, '#06a561'], ['61-90天', g.a90, '#f08c00'], ['91-365天', g.a180, '#e15241'], ['365天+', g.a365, '#8b5cf6']];
+    const seg = [['0-30天', g.a30, '#06a561'], ['31-60天', g.a60, '#3fae7a'], ['61-90天', g.a90, '#f5c216'], ['91-180天', g.a91, '#f08c00'], ['181-270天', g.a181, '#e15241'], ['271-330天', g.a271, '#c0392b'], ['331-365天', g.a331, '#9b1c1c'], ['365天+', g.a365, '#6b21a8']];
     const tot = seg.reduce((s, x) => s + x[1], 0) || 1;
     return `<div style="margin-bottom:9px">
       <div style="display:flex;justify-content:space-between;font-size:11px"><span>${p.asin} · ${p.name.slice(0, 24)}</span><span style="color:var(--text3)">合计 ${fmt(tot)} 件</span></div>
       <div style="display:flex;height:16px;border-radius:4px;overflow:hidden;margin-top:4px">
         ${seg.filter(s2 => s2[1] > 0).map(s2 => `<div style="width:${s2[1] / tot * 100}%;background:${s2[2]}" title="${s2[0]}: ${fmt(s2[1])} 件"></div>`).join('')}
       </div></div>`;
-  }).join('') + `<div style="font-size:10.5px;color:var(--text3);margin-top:6px">色块：<span style="color:#06a561">0-60天</span> / <span style="color:#f08c00">61-90天</span> / <span style="color:#e15241">91-365天</span> / <span style="color:#8b5cf6">365天+</span>（按库存快照库龄分段）</div>`
+  }).join('') + `<div style="font-size:10.5px;color:var(--text3);margin-top:6px">色块：${seg.map(s2 => `<span style="color:${s2[2]}">${s2[0]}</span>`).join(' / ')}（与源表 8 段库龄对齐）</div>`
     : '<div class="nodata">所有 ASIN 库龄均在 90 天内，无超龄库存 ✓</div>';
 }
 
@@ -2052,10 +2052,10 @@ const STOCK_ALIASES = {
   '库龄（0~30）': 'age30', '库龄(0~30)': 'age30', '库龄0~30': 'age30',
   '库龄（31~60）': 'age60', '库龄(31~60)': 'age60', '库龄31~60': 'age60',
   '库龄（61~90）': 'age90', '库龄(61~90)': 'age90', '库龄61~90': 'age90',
-  '库龄（91~180）': 'ageMid', '库龄(91~180)': 'ageMid', '库龄91~180': 'ageMid',
-  '库龄（181~270）': 'ageMid', '库龄(181~270)': 'ageMid', '库龄181~270': 'ageMid',
-  '库龄（271~330）': 'ageMid', '库龄(271~330)': 'ageMid', '库龄271~330': 'ageMid',
-  '库龄（331~365）': 'ageMid', '库龄(331~365)': 'ageMid', '库龄331~365': 'ageMid',
+  '库龄（91~180）': 'age91', '库龄(91~180)': 'age91', '库龄91~180': 'age91',
+  '库龄（181~270）': 'age181', '库龄(181~270)': 'age181', '库龄181~270': 'age181',
+  '库龄（271~330）': 'age271', '库龄(271~330)': 'age271', '库龄271~330': 'age271',
+  '库龄（331~365）': 'age331', '库龄(331~365)': 'age331', '库龄331~365': 'age331',
   '库龄（365+）': 'age365', '库龄(365+)': 'age365', '库龄365+': 'age365',
 };
 const hasDateCol = headers => headers.some(h => /日期|date/i.test(String(h ?? '')));
@@ -2098,8 +2098,8 @@ function rowsFromTable(headers, body, opt = {}) {
         sn[f] = (sn[f] || 0) + Math.abs(num);
       });
       if (Object.keys(sn).length) {
-        /* 库龄 91-365 合并进 age180 桶（看板只有 5 个库龄段） */
-        if ('ageMid' in sn) { sn.age180 = (sn.age180 || 0) + sn.ageMid; delete sn.ageMid; }
+        /* 库龄按源表 8 段原样保留：age30/60/90/91/181/271/331/365 */
+        if ('ageMid' in sn) { sn.age91 = (sn.age91 || 0) + sn.ageMid; delete sn.ageMid; }
         stockOut[row[1]] = sn;
         stockN++;
       }
@@ -2239,6 +2239,7 @@ function saveStockSnap(snap, date) {
     /* 快照只进不退：导入更早日期的文件不能覆盖更新日期的库存 */
     if (old && old.snapDate && date && old.snapDate > date) { skipped++; return; }
     cur[k] = Object.assign({}, old || {}, snap[k], { snapDate: date });
+    if (snap[k] && snap[k].age91 !== undefined && cur[k].age180 !== undefined) delete cur[k].age180; /* 旧版91-365合并段已拆为8段 */
     n++;
   });
   try { localStorage.setItem('dash_stock_v1', JSON.stringify(cur)); } catch (e) { console.warn('库存快照写入失败', e); }
