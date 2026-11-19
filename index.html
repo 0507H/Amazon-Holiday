@@ -295,6 +295,8 @@ const TOOLS = {
 };
 const TASK_KEY = 'lfh_tasks_v1';
 const DAY = 86400000;
+/* 构建版本：每次改完工具页 +1，iframe 带版本号加载，彻底杜绝浏览器拿到旧缓存 */
+const BUILD = '20261119-1920';
 
 const $ = (id) => document.getElementById(id);
 const nav = $('nav'), frame = $('toolFrame'), wrap = $('frameWrap'), dash = $('dash');
@@ -541,9 +543,9 @@ function openTool(key, sub){
   requestAnimationFrame(fitFrame);
   if(curTool === key){
     try{ frame.contentWindow.location.hash = hash; }
-    catch(e){ frame.src = t.file + hash; }
+    catch(e){ frame.src = t.file + '?v=' + BUILD + hash; }
   } else {
-    frame.src = t.file + hash;
+    frame.src = t.file + '?v=' + BUILD + hash;
   }
   curTool = key;
   const subT = el ? el.querySelector('.tx').textContent : t.title;

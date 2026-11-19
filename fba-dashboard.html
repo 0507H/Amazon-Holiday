@@ -590,6 +590,7 @@ select:focus,input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(4
             </div>
             <div style="margin:0 0 12px;padding:9px 12px;border:1.5px dashed #c7d4ff;border-radius:8px;background:#f7f9ff;font-size:11.5px;color:#3b4f8a;display:flex;align-items:center;gap:8px">
               <span style="font-size:15px">📥</span><span><b>也可以直接拖拽</b>：把文件拖到页面任意位置，松手即开始解析；拖入时全屏提示「松开鼠标导入」，解析中、成功、失败都有明确反馈，不会静默无响应。</span>
+              <span id="dragBadge" style="margin-left:auto;white-space:nowrap;font-size:10.5px;color:#8b96ad">拖拽监听绑定中…</span>
             </div>
             <div id="importStatus" class="hide" style="margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:11.5px;line-height:1.7"></div>
             <div style="padding:9px;background:#eef4ff;border-radius:7px;font-size:11px;color:#2b4a8a;line-height:1.9">
@@ -2524,6 +2525,10 @@ function dropTargetMsgSel() {
     if (fs.length > 1) importMsg(`一次只导入 1 个文件，本次只取「${fs[0].name}」`, false, sel);
     handleImportFile(fs[0], sel);
   });
+  /* 绑定完成标记：页面上能看到"拖拽监听已启用"，用于区分"代码没生效"还是"浏览器没把拖拽事件送进来" */
+  window.__dragReady = true;
+  const badge = document.getElementById('dragBadge');
+  if (badge) badge.innerHTML = '<span style="color:#1a7f45">● 拖拽监听已启用</span> · v1119.1920';
 })();
 
 /* ===== 季节 ===== */
