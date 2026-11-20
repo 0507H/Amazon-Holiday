@@ -588,8 +588,8 @@ select:focus,input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(4
               <button class="fbtn" id="btnClearImport" style="color:#d63031">🗑 清除全部数据（回到空白首页）</button>
               <span id="importMsg" style="font-size:11.5px;color:var(--text3)"></span>
             </div>
-            <div style="margin:0 0 12px;padding:9px 12px;border:1.5px dashed #c7d4ff;border-radius:8px;background:#f7f9ff;font-size:11.5px;color:#3b4f8a;display:flex;align-items:center;gap:8px">
-              <span style="font-size:15px">📥</span><span><b>也可以直接拖拽</b>：把文件拖到页面任意位置，松手即开始解析；拖入时全屏提示「松开鼠标导入」，解析中、成功、失败都有明确反馈，不会静默无响应。</span>
+            <div style="margin:0 0 12px;padding:9px 12px;border:1.5px dashed #c7d4ff;border-radius:8px;background:#f7f9ff;font-size:11.5px;color:#3b4f8a;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:15px">📥</span><span><b>推荐：直接拖拽</b>——把文件拖到页面任意位置，松手即开始解析。<b>点按钮弹不出文件窗口？</b>（部分内嵌浏览器会禁用弹窗）就用拖拽，或在文件管理器里<b>复制文件后按 Ctrl+V 粘贴</b>到本页，效果相同。</span>
               <span id="dragBadge" style="margin-left:auto;white-space:nowrap;font-size:10.5px;color:#8b96ad">拖拽监听绑定中…</span>
             </div>
             <div id="importStatus" class="hide" style="margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:11.5px;line-height:1.7"></div>
@@ -2528,7 +2528,7 @@ function dropTargetMsgSel() {
   /* 绑定完成标记：页面上能看到"拖拽监听已启用"，用于区分"代码没生效"还是"浏览器没把拖拽事件送进来" */
   window.__dragReady = true;
   const badge = document.getElementById('dragBadge');
-  if (badge) badge.innerHTML = '<span style="color:#1a7f45">● 拖拽监听已启用</span> · v1119.1920';
+  if (badge) badge.innerHTML = '<span style="color:#1a7f45">● 拖拽监听已启用</span> · v1120.1000（拖拽 / Ctrl+V 粘贴 / 点按钮）';
 })();
 
 /* ===== 季节 ===== */
@@ -4538,6 +4538,19 @@ init();
 
 /* ===== 数据导入 / 导出事件绑定 ===== */
 $('#importFile').addEventListener('change', e => { if (e.target.files[0]) handleImportFile(e.target.files[0]); e.target.value = ''; });
+/* 点按钮弹不出系统文件窗口的环境（内嵌浏览器禁用弹窗）：点击时给出替代通道提示 */
+$('#importFile').addEventListener('click', () => {
+  importMsg('⏳ 已请求打开文件选择窗口…若窗口没弹出（部分内嵌浏览器禁用弹窗），请直接把文件拖到页面任意位置，或在文件管理器复制文件后按 Ctrl+V 粘贴导入', false);
+});
+/* 粘贴导入：文件管理器里复制文件 → 本页 Ctrl+V（不依赖系统弹窗，内嵌环境也可用） */
+window.addEventListener('paste', e => {
+  const fs = e.clipboardData && e.clipboardData.files;
+  if (fs && fs.length) {
+    e.preventDefault();
+    if (fs.length > 1) importMsg(`一次只导入 1 个文件，本次只取「${fs[0].name}」`, false, dropTargetMsgSel());
+    handleImportFile(fs[0], dropTargetMsgSel());
+  }
+});
 $('#btnExportJson').onclick = () => { window.DASH.exportRows(); };
 $('#btnArchive').onclick = createArchive;
 $('#btnExportCsv').onclick = exportCSV;
