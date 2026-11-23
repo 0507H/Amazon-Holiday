@@ -1995,19 +1995,20 @@ function renderStock() {
     </tr>`;
   }).join('') : `<tr><td colspan="13" class="nodata">「${fCur}」状态下暂无 ASIN ✓</td></tr>`;
 
-  // 库龄结构：取库龄件数 Top8
+  // 库龄结构：取库龄件数 Top8（8 段定义提到回调外，图例也要用）
+  const AGE_SEGS = [['0-30天', g => g.a30, '#06a561'], ['31-60天', g => g.a60, '#3fae7a'], ['61-90天', g => g.a90, '#f5c216'], ['91-180天', g => g.a91, '#f08c00'], ['181-270天', g => g.a181, '#e15241'], ['271-330天', g => g.a271, '#c0392b'], ['331-365天', g => g.a331, '#9b1c1c'], ['365天+', g => g.a365, '#6b21a8']];
   const aged = s.list.map(p => ({ p, tot: (p.ages ? p.ages.a90 + p.ages.a91 + p.ages.a181 + p.ages.a271 + p.ages.a331 + p.ages.a365 : 0) + (p.deadQty || 0) }))
     .filter(x => x.tot > 0).sort((x, y) => y.tot - x.tot).slice(0, 8);
   $('#ageChart').innerHTML = aged.length ? aged.map(({ p }) => {
     const g = p.ages || {};
-    const seg = [['0-30天', g.a30, '#06a561'], ['31-60天', g.a60, '#3fae7a'], ['61-90天', g.a90, '#f5c216'], ['91-180天', g.a91, '#f08c00'], ['181-270天', g.a181, '#e15241'], ['271-330天', g.a271, '#c0392b'], ['331-365天', g.a331, '#9b1c1c'], ['365天+', g.a365, '#6b21a8']];
+    const seg = AGE_SEGS.map(([lb, get, col]) => [lb, get(g), col]);
     const tot = seg.reduce((s, x) => s + x[1], 0) || 1;
     return `<div style="margin-bottom:9px">
       <div style="display:flex;justify-content:space-between;font-size:11px"><span>${p.asin} · ${p.name.slice(0, 24)}</span><span style="color:var(--text3)">合计 ${fmt(tot)} 件</span></div>
       <div style="display:flex;height:16px;border-radius:4px;overflow:hidden;margin-top:4px">
         ${seg.filter(s2 => s2[1] > 0).map(s2 => `<div style="width:${s2[1] / tot * 100}%;background:${s2[2]}" title="${s2[0]}: ${fmt(s2[1])} 件"></div>`).join('')}
       </div></div>`;
-  }).join('') + `<div style="font-size:10.5px;color:var(--text3);margin-top:6px">色块：${seg.map(s2 => `<span style="color:${s2[2]}">${s2[0]}</span>`).join(' / ')}（与源表 8 段库龄对齐）</div>`
+  }).join('') + `<div style="font-size:10.5px;color:var(--text3);margin-top:6px">色块：${AGE_SEGS.map(s2 => `<span style="color:${s2[2]}">${s2[0]}</span>`).join(' / ')}（与源表 8 段库龄对齐）</div>`
     : '<div class="nodata">所有 ASIN 库龄均在 90 天内，无超龄库存 ✓</div>';
 }
 
@@ -2554,7 +2555,7 @@ function dropTargetMsgSel() {
   /* 绑定完成标记：页面上能看到"拖拽监听已启用"，用于区分"代码没生效"还是"浏览器没把拖拽事件送进来" */
   window.__dragReady = true;
   const badge = document.getElementById('dragBadge');
-  if (badge) badge.innerHTML = '<span style="color:#1a7f45">● 拖拽监听已启用</span> · v1123.1730（拖拽 / Ctrl+V 粘贴 / 点按钮）';
+  if (badge) badge.innerHTML = '<span style="color:#1a7f45">● 拖拽监听已启用</span> · v1123.1815（拖拽 / Ctrl+V 粘贴 / 点按钮）';
 })();
 
 /* ===== 季节 ===== */
