@@ -593,10 +593,15 @@ select:focus,input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(4
               <span id="dragBadge" style="margin-left:auto;white-space:nowrap;font-size:10.5px;color:#8b96ad">拖拽监听绑定中…</span>
             </div>
             <div id="importStatus" class="hide" style="margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:11.5px;line-height:1.7"></div>
+            <div style="margin:0 0 12px;padding:9px 12px;border:1px solid var(--line2);border-radius:8px;font-size:11.5px;color:var(--text2);display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fbfbfd">
+              <span><b>汇总文件名日期口径</b>：<label style="cursor:pointer;margin-right:10px"><input type="radio" name="fnOff" value="-1"> 文件名−1天（美西回退，推荐）</label><label style="cursor:pointer"><input type="radio" name="fnOff" value="0"> 文件名原样</label></span>
+              <span style="color:var(--line2)">｜</span>
+              <span>🛠 日期平移：把 <select id="shiftFrom" style="font-size:11px;padding:2px 4px"></select> 的数据整体移到 <select id="shiftTo" style="font-size:11px;padding:2px 4px"></select> <button class="fbtn" id="btnShiftDate" style="font-size:11px;padding:3px 10px">执行平移</button></span>
+            </div>
             <div style="padding:9px;background:#eef4ff;border-radius:7px;font-size:11px;color:#2b4a8a;line-height:1.9">
               <b>导入说明</b>：支持两种导出文件，<b>自动识别类型</b> ——<br>
               · <b>按日导出</b>（75 列，含「日期」列）→ 写入按日明细，用于销量/趋势/预测；<br>
-              · <b>汇总导出</b>（96 列，<b>没有日期列</b>，但含 FBA可售 / 库龄 / 滞销货值 / 周转）→ <b>按文件名自动识别归属日期</b>：把日期写进文件名即可，如 <b>26圣诞-11.19-汇总</b>（单日）或 <b>26圣诞-11.19~11.23-汇总</b>（区间，取结束日），也支持 20261119 / 11月19 写法；文件名没日期才会弹窗补问。<b>自动更新库存快照</b>；若判定为单日数据（销量 ÷ 平均日销量 ≈ 1），同时写入当天明细，<b>一个文件就够</b>；若判定为多日累计，只更新库存、不写明细（避免把 30 天的量压进一天）。<br>
+              · <b>汇总导出</b>（96 列，<b>没有日期列</b>，但含 FBA可售 / 库龄 / 滞销货值 / 周转）→ <b>按文件名自动识别归属日期</b>：把日期写进文件名即可，如 <b>26圣诞-11.19-汇总</b>（单日）或 <b>26圣诞-11.19~11.23-汇总</b>（区间，取结束日），也支持 20261119 / 11月19 写法；文件名没日期才会弹窗补问。<b>默认自动 −1 天（美西回退）</b>：文件名一般是本地导出日，美西数据比本地晚一天，如「11.20-汇总」里的数据归属 11.19；如你的文件名写的就是数据日，在上方切换为「文件名原样」。<b>自动更新库存快照</b>；若判定为单日数据（销量 ÷ 平均日销量 ≈ 1），同时写入当天明细，<b>一个文件就够</b>；若判定为多日累计，只更新库存、不写明细（避免把 30 天的量压进一天）。<br>
               另外支持看板导出的 <b>JSON 备份</b>（完整恢复）。合并规则：<b>同一天 + 同一 ASIN</b> 新行覆盖旧行；费用列负数自动取绝对值；库存快照<b>只进不退</b>（导入更早日期的文件不会覆盖更新的库存）。数据与快照均保存在本机浏览器，下次打开自动生效。
             </div>
           </div>
@@ -2280,6 +2285,16 @@ function saveStockSnap(snap, date) {
 function stockSnapDate() {
   try { return localStorage.getItem('dash_stock_date_v1') || ''; } catch (e) { return ''; }
 }
+/* 汇总文件名日期口径：文件名一般是本地导出日，美西数据比本地晚一天 → 默认回退 1 天；
+   数据源页可切换为「文件名原样」（LS: dash_fn_offset，-1 默认 / 0 原样） */
+function fnDateOffset() {
+  try { return localStorage.getItem('dash_fn_offset') === '0' ? 0 : -1; } catch (e) { return -1; }
+}
+function shiftDateStr(d, n) {
+  const t = new Date(d + 'T00:00:00');
+  t.setDate(t.getDate() + n);
+  return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+}
 /* 从文件名识别日期（命名规范：26圣诞-11.19-汇总 / 26圣诞-11.19~11.23-汇总 / 20261119-汇总）
    区间取结束日（快照以最新一天为准）；跨年自动回退（1月导入12月的数据 → 上一年） */
 function dateFromFileName(name) {
@@ -2302,8 +2317,17 @@ function dateFromFileName(name) {
 /* 汇总导出没有日期列：文件名符合命名规范 → 直接用文件名日期（区间取结束日）；
    文件名没有日期才弹窗问（默认今天），可改 */
 function askImportDate(name) {
+  window.__impDateNote = '';
   const guess = dateFromFileName(name);
-  if (guess) return guess;   // 按命名规范自动识别，不弹窗
+  if (guess) {
+    const off = fnDateOffset();
+    if (off) {
+      const d = shiftDateStr(guess, off);
+      window.__impDateNote = `文件名日期 ${guess.slice(5)} −${-off} 天（美西回退）→ 归属 ${d}`;
+      return d;
+    }
+    return guess;
+  }
   const v = prompt(
     '这个文件没有「日期」列（通常是「汇总导出」）。\n' +
     '请填这份数据归属的日期，格式 2026-11-17：\n（下次可把日期写进文件名自动识别，如 26圣诞-11.19-汇总）', todayStr());
@@ -2441,7 +2465,8 @@ function handleImportFile(file, sel) {
         }
         if (!newRows.length) {
           if (stockMsg) {
-            const okTxt = `${stockMsg}${stockInfo ? ' ' + stockInfo : ''} 按日明细未变更，看板已按新库存重算`;
+        const dateNote = (typeof window.__impDateNote === 'string' && window.__impDateNote) ? `；${window.__impDateNote}` : '';
+        const okTxt = `${stockMsg}${stockInfo ? ' ' + stockInfo : ''}${dateNote} 按日明细未变更，看板已按新库存重算`;
             importMsg(`✅ ${okTxt}`, false, sel);
             tipState('ok', '导入成功', okTxt + ' · 正在刷新…');
             setTimeout(() => location.reload(), 1500);
@@ -2461,7 +2486,8 @@ function handleImportFile(file, sel) {
           });
           localStorage.setItem('dash_todo_v1', JSON.stringify(local));
         }
-        const okTxt = `新增 ${r.added} 行、覆盖 ${r.updated} 行，当前共 ${r.total} 行明细${todoN ? `；恢复任务记录 ${todoN} 条` : ''}${stockMsg ? '；' + stockMsg : ''}${stockInfo ? ' ' + stockInfo : ''}`;
+        const dateNote = (typeof window.__impDateNote === 'string' && window.__impDateNote) ? `；${window.__impDateNote}` : '';
+        const okTxt = `新增 ${r.added} 行、覆盖 ${r.updated} 行，当前共 ${r.total} 行明细${todoN ? `；恢复任务记录 ${todoN} 条` : ''}${stockMsg ? '；' + stockMsg : ''}${stockInfo ? ' ' + stockInfo : ''}${dateNote}`;
         importMsg(`✅ 合并完成：${okTxt}，看板已全量重算`, false, sel);
         tipState('ok', '导入成功', okTxt + ' · 正在刷新…');
         setTimeout(() => location.reload(), 1500);
@@ -2528,7 +2554,7 @@ function dropTargetMsgSel() {
   /* 绑定完成标记：页面上能看到"拖拽监听已启用"，用于区分"代码没生效"还是"浏览器没把拖拽事件送进来" */
   window.__dragReady = true;
   const badge = document.getElementById('dragBadge');
-  if (badge) badge.innerHTML = '<span style="color:#1a7f45">● 拖拽监听已启用</span> · v1120.1000（拖拽 / Ctrl+V 粘贴 / 点按钮）';
+  if (badge) badge.innerHTML = '<span style="color:#1a7f45">● 拖拽监听已启用</span> · v1123.1730（拖拽 / Ctrl+V 粘贴 / 点按钮）';
 })();
 
 /* ===== 季节 ===== */
@@ -3812,7 +3838,54 @@ function renderArchives() {
     </tr>`).join('') + '</tbody></table></div>' +
     `<div style="font-size:10.5px;color:var(--text3);margin-top:8px">提示：归档保存在本机浏览器 localStorage（有容量上限，约能存 2-3 个月度归档）；跨设备请用「⬇ JSON」导出文件保存。</div>`;
 }
+/* 日期平移修正：把某个日期的全部「导入」明细与库存快照整体移到另一天（种子内置数据不动）
+   环境禁用 confirm 弹窗 → 两段式确认（按钮点一次变红预警，6 秒内再点一次才执行） */
+function shiftImportedDates(from, to) {
+  if (!from || !to || from === to) { importMsg('❌ 请先在两个下拉框里选好「从日期」和「到日期」（两者需不同）', true); return; }
+  const btn = document.getElementById('btnShiftDate');
+  if (btn.dataset.arm !== from + '>' + to) {
+    btn.dataset.arm = from + '>' + to;
+    btn.textContent = '⚠ 确认平移？再点一次';
+    btn.style.color = '#d63031';
+    setTimeout(() => { if (btn.dataset.arm === from + '>' + to) { btn.dataset.arm = ''; btn.textContent = '执行平移'; btn.style.color = ''; } }, 6000);
+    return;
+  }
+  btn.dataset.arm = ''; btn.textContent = '执行平移'; btn.style.color = '';
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem('dash_imported') || '[]'); } catch (e) {}
+  const moving = saved.filter(r => r[0] === from);
+  if (!moving.length) { importMsg(`❌ ${from} 没有可平移的导入数据（只有导入过的数据参与平移，内置种子不动）`, true); return; }
+  const keys = new Set(moving.map(r => r[0] + '|' + r[1]));
+  const out = [];
+  saved.forEach(r => { if (r[0] === from) { r[0] = to; out.push(r); } else if (!keys.has(r[0] + '|' + r[1])) out.push(r); });
+  try { localStorage.setItem('dash_imported', JSON.stringify(out)); } catch (e) { importMsg('❌ 写入失败：' + e.message, true); return; }
+  let sn = 0;
+  try {
+    const snap = JSON.parse(localStorage.getItem('dash_stock_v1') || '{}');
+    Object.keys(snap).forEach(k => { if (snap[k] && snap[k].snapDate === from) { snap[k].snapDate = to; sn++; } });
+    localStorage.setItem('dash_stock_v1', JSON.stringify(snap));
+    if (localStorage.getItem('dash_stock_date_v1') === from) localStorage.setItem('dash_stock_date_v1', to);
+  } catch (e) {}
+  importMsg(`✅ 已把 ${from} 的 ${moving.length} 行明细平移到 ${to}${sn ? `，库存快照 ${sn} 个 ASIN 同步平移` : ''}，正在刷新…`, false);
+  setTimeout(() => location.reload(), 1200);
+}
+
 function renderDataPage() {
+  /* 汇总文件名日期口径单选 + 日期平移工具 */
+  const curOff = fnDateOffset();
+  document.querySelectorAll('input[name=fnOff]').forEach(r => {
+    r.checked = (parseInt(r.value, 10) === curOff);
+    r.onchange = () => {
+      try { localStorage.setItem('dash_fn_offset', r.value); } catch (e) {}
+      importMsg(r.value === '0' ? '✅ 已切换：汇总文件名日期原样使用（文件名 11.20 就归 11.20）' : '✅ 已切换：汇总文件名日期自动 −1 天（美西回退，文件名 11.20 归 11.19）', false);
+    };
+  });
+  const dates = [...new Set((window.DASH.rawRows || []).map(r => r[0]))].filter(Boolean).sort().reverse();
+  const opts = dates.map(d => `<option value="${d}">${d}</option>`).join('');
+  const sf = document.getElementById('shiftFrom'), st = document.getElementById('shiftTo');
+  if (sf) { sf.innerHTML = '<option value="">（选从日期）</option>' + opts; st.innerHTML = '<option value="">（选到日期）</option>' + opts; }
+  const btn = document.getElementById('btnShiftDate');
+  if (btn) btn.onclick = () => shiftImportedDates(sf ? sf.value : '', st ? st.value : '');
   const snapD = stockSnapDate();
   const lsSnap = loadStockSnap();
   const snapN = Object.keys(lsSnap).length;
